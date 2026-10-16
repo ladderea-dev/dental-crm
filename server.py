@@ -5381,7 +5381,11 @@ async def api_wa_webhook_verify(
     hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
 ):
     from db import get_setting as _gs
-    verify_token = await _gs("WEBHOOK_VERIFY_TOKEN", "") or await _gs("WHATSAPP_VERIFY_TOKEN", "")
+    verify_token = (
+        await _gs("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "")
+        or await _gs("WEBHOOK_VERIFY_TOKEN", "")
+        or await _gs("WHATSAPP_VERIFY_TOKEN", "")
+    )
     if (
         hub_mode == "subscribe"
         and verify_token
