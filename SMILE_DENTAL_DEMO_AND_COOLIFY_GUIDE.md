@@ -184,3 +184,34 @@ GOOGLE_API_KEY=your_gemini_api_key_here
    - High-fidelity JSON containing treatment descriptions, pricing indications, Google Maps directions, landmark details, and answers to all patient FAQs.
 5. **AI Assistant Instructions:**
    - Empathic, professional, reassuring dental tone emphasizing painless modern dentistry and encouraging clinic consultation.
+
+---
+
+## 7. Dental Billing, Revenue Tracking & Sales Reporting System
+
+A dedicated clinic financial, invoicing, and revenue tracking system built specifically for Smile Dental:
+
+1. **Interactive Invoicing & Treatment Catalog:**
+   - Multi-item dental bill generator with pre-loaded Smile Dental procedures (Consultation, Scaling & Polishing, Composite Fillings, Painless RCT, Zirconia Crowns, Titanium Dental Implants, All-on-4, Clear Aligners, Dentures, etc.).
+   - Tooth number recording per procedure (e.g. Tooth #14, #21).
+   - Automated subtotal, discount, tax, and balance calculations.
+   - Sequential clinic invoice numbering: `SD-YYYY-XXXX`.
+
+2. **Partial Payments & Installment Management:**
+   - Multi-channel payments: UPI (GPay, PhonePe), Cash, Debit/Credit Card (POS), Bank Transfer, and Bajaj Finserv Dental EMI.
+   - Real-time tracking of `Paid in Full`, `Partial / Balance Due`, and `Pending Payment`.
+   - Installment recording for multi-sitting treatments (e.g., Implants, Root Canals, Smile Makeovers).
+
+3. **Doctor Revenue Attribution:**
+   - Attending doctor attribution on each invoice (Dr. P. Sudhakar vs Dr. K. Mounika).
+   - Real-time doctor revenue share breakdown, realization percentage, and case counts.
+
+4. **Sales Analytics & Reports:**
+   - Real-time KPIs: Total Billed, Total Collected, Total Outstanding, Average Bill Value.
+   - Filter by date range, attending doctor, and payment status.
+   - 1-Click Excel / CSV sales report export (`/api/billing/export`).
+
+5. **Printable Clinic Tax Bill & 1-Click WhatsApp Receipts:**
+   - Professional, clinic-branded printable invoice with clinic address, phone numbers, treatment line items, and authorized doctor signature line.
+   - 1-Click WhatsApp itemized receipt generator dispatched directly to patient's mobile number.
+
