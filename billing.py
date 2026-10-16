@@ -78,6 +78,7 @@ async def create_invoice(payload: dict) -> dict:
 
     doctor_name = (payload.get("doctor_name") or "Dr. P. Sudhakar").strip()
     doctor_id = (payload.get("doctor_id") or "").strip()
+    branch_name = (payload.get("branch_name") or "ECIL / Kapra (Main Clinic)").strip()
     treatment_date_str = payload.get("treatment_date") or date.today().isoformat()
     notes = (payload.get("notes") or "").strip()
     payment_method = (payload.get("payment_method") or "UPI").strip()
@@ -128,19 +129,19 @@ async def create_invoice(payload: dict) -> dict:
             await cur.execute(
                 """
                 INSERT INTO invoices (
-                    id, invoice_number, patient_name, phone, doctor_id, doctor_name,
+                    id, invoice_number, patient_name, phone, doctor_id, doctor_name, branch_name,
                     treatment_date, subtotal, discount, tax, total_amount, paid_amount,
                     balance_amount, payment_status, payment_method, notes,
                     created_at, updated_at
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s,
+                    %s, %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s, %s,
                     %s, %s, %s, %s,
                     NOW(6), NOW(6)
                 )
                 """,
                 (
-                    inv_id, inv_number, patient_name, phone, doctor_id, doctor_name,
+                    inv_id, inv_number, patient_name, phone, doctor_id, doctor_name, branch_name,
                     treatment_date_str, float(subtotal), float(discount), float(tax),
                     float(total_amount), float(paid_amount), float(balance_amount),
                     status, payment_method, notes
@@ -228,6 +229,7 @@ async def list_invoices(
     q: Optional[str] = None,
     status: Optional[str] = None,
     doctor_name: Optional[str] = None,
+    branch_name: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     limit: int = 50,
@@ -252,6 +254,10 @@ async def list_invoices(
             where_clauses.append("doctor_name LIKE %s")
             params.append(f"%{doctor_name.strip()}%")
 
+        if branch_name and branch_name.strip():
+            where_clauses.append("branch_name LIKE %s")
+            params.append(f"%{branch_name.strip()}%")
+
         if date_from and date_from.strip():
             where_clauses.append("treatment_date >= %s")
             params.append(date_from.strip())
@@ -269,7 +275,7 @@ async def list_invoices(
 
             # Fetch rows
             query = f"""
-                SELECT id, invoice_number, patient_name, phone, doctor_name, treatment_date,
+                SELECT id, invoice_number, patient_name, phone, doctor_name, branch_name, treatment_date,
                        subtotal, discount, total_amount, paid_amount, balance_amount,
                        payment_status, payment_method, created_at
                 FROM invoices
@@ -343,7 +349,11 @@ async def add_invoice_payment(invoice_id: str, amount: float, payment_method: st
     return await get_invoice(invoice_id)
 
 
-async def get_revenue_summary(date_from: Optional[str] = None, date_to: Optional[str] = None) -> dict:
+async def get_revenue_summary(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    branch_name: Optional[str] = None
+) -> dict:
     """Aggregate financial KPIs, doctor revenue attribution, and category breakdown."""
     pool = await _get_pool()
     async with pool.acquire() as conn:
@@ -355,6 +365,9 @@ async def get_revenue_summary(date_from: Optional[str] = None, date_to: Optional
         if date_to and date_to.strip():
             where_clauses.append("treatment_date <= %s")
             params.append(date_to.strip())
+        if branch_name and branch_name.strip():
+            where_clauses.append("branch_name LIKE %s")
+            params.append(f"%{branch_name.strip()}%")
 
         where_str = " AND ".join(where_clauses)
 
@@ -406,7 +419,35 @@ async def get_revenue_summary(date_from: Optional[str] = None, date_to: Optional
                     "collected": float(r[3] or 0.0),
                 })
 
-            # 3. Payment Method breakdown
+            # 3. Branch-wise Revenue breakdown
+            await cur.execute(
+                f"""
+                SELECT
+                    COALESCE(branch_name, 'ECIL / Kapra (Main Clinic)') as branch,
+                    COUNT(*) as count,
+                    COALESCE(SUM(total_amount), 0) as billed,
+                    COALESCE(SUM(paid_amount), 0) as collected,
+                    COALESCE(SUM(balance_amount), 0) as balance
+                FROM invoices
+                WHERE {where_str}
+                GROUP BY branch
+                ORDER BY billed DESC
+                """,
+                tuple(params)
+            )
+            branch_rows = await cur.fetchall()
+            branches = [
+                {
+                    "branch_name": r[0] or "ECIL / Kapra (Main Clinic)",
+                    "count": int(r[1] or 0),
+                    "billed": float(r[2] or 0.0),
+                    "collected": float(r[3] or 0.0),
+                    "balance": float(r[4] or 0.0),
+                }
+                for r in branch_rows
+            ]
+
+            # 4. Payment Method breakdown
             await cur.execute(
                 f"""
                 SELECT
@@ -429,7 +470,7 @@ async def get_revenue_summary(date_from: Optional[str] = None, date_to: Optional
                     "collected": float(r[2] or 0.0),
                 })
 
-            # 4. Status counts
+            # 5. Status counts
             await cur.execute(
                 f"""
                 SELECT
@@ -446,8 +487,8 @@ async def get_revenue_summary(date_from: Optional[str] = None, date_to: Optional
             status_rows = await cur.fetchall()
             statuses = {r[0]: {"count": int(r[1]), "billed": float(r[2]), "balance": float(r[3])} for r in status_rows}
 
-            # 5. Top Treatments / Service breakdown
-            item_where_str = where_str.replace("treatment_date", "inv.treatment_date")
+            # 6. Top Treatments / Service breakdown
+            item_where_str = where_str.replace("treatment_date", "inv.treatment_date").replace("branch_name", "inv.branch_name")
             await cur.execute(
                 f"""
                 SELECT
@@ -478,6 +519,7 @@ async def get_revenue_summary(date_from: Optional[str] = None, date_to: Optional
                 "total_discount": tot_discount,
                 "average_bill_value": round(avg_bill, 2),
                 "doctor_revenue": doctors,
+                "branch_revenue": branches,
                 "payment_methods": methods,
                 "payment_statuses": statuses,
                 "top_treatments": treatments,

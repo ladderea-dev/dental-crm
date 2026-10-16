@@ -1076,6 +1076,60 @@ async def admin_staff_attendance(date_from: str = "", date_to: str = "", staff_i
     return {"date_from": start, "date_to": end, "attendance": rows}
 
 
+class QuickAttendanceRequest(BaseModel):
+    staff_id: str
+    action: str = "check_in"
+    work_date: str = ""
+    notes: str = ""
+
+
+class CreateLeaveRequest(BaseModel):
+    staff_id: str
+    leave_type: str = "medical"
+    start_date: str
+    end_date: str
+    reason: str = ""
+
+
+@router.post("/api/staff-attendance/quick-record")
+async def admin_quick_record_attendance(req: QuickAttendanceRequest):
+    repo = get_repository()
+    now = _utcnow()
+    work_date = req.work_date or now.strftime("%Y-%m-%d")
+    if req.action == "check_in":
+        row = {
+            "id": str(uuid.uuid4()),
+            "staff_id": req.staff_id,
+            "work_date": work_date,
+            "check_in_at": _iso(now),
+            "check_in_latitude": None,
+            "check_in_longitude": None,
+            "check_in_accuracy_meters": None,
+            "check_in_session_id": None,
+            "notes": req.notes.strip() or "Quick check-in recorded via clinic operations desk",
+            "created_at": _iso(now),
+            "updated_at": _iso(now),
+        }
+        attendance = await repo.check_in_staff_attendance(row)
+        return {"success": True, "action": "check_in", "attendance": attendance}
+    else:
+        try:
+            attendance = await repo.check_out_staff_attendance(
+                req.staff_id,
+                work_date,
+                {
+                    "check_out_at": _iso(now),
+                    "check_out_latitude": None,
+                    "check_out_longitude": None,
+                    "check_out_accuracy_meters": None,
+                    "check_out_session_id": None,
+                },
+            )
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        return {"success": True, "action": "check_out", "attendance": attendance}
+
+
 @router.get("/api/staff-leave-requests")
 async def admin_staff_leave_requests(status: str = "", staff_id: str = ""):
     clean_status = status.strip().lower()
@@ -1083,6 +1137,36 @@ async def admin_staff_leave_requests(status: str = "", staff_id: str = ""):
         raise HTTPException(422, "Invalid leave status")
     rows = await get_repository().list_staff_leave_requests(staff_id=staff_id, status=clean_status)
     return {"leave_requests": rows}
+
+
+@router.post("/api/staff-leave-requests")
+async def admin_create_staff_leave_request(req: CreateLeaveRequest):
+    repo = get_repository()
+    now = _utcnow()
+    raw_type = (req.leave_type or "medical").lower().strip()
+    type_map = {
+        "casual": "other",
+        "sick": "medical",
+        "vacation": "annual",
+    }
+    leave_type = type_map.get(raw_type, raw_type)
+    if leave_type not in {"annual", "medical", "emergency", "unpaid", "other"}:
+        leave_type = "other"
+
+    row = {
+        "id": str(uuid.uuid4()),
+        "staff_id": req.staff_id,
+        "leave_type": leave_type,
+        "start_date": req.start_date,
+        "end_date": req.end_date,
+        "reason": req.reason.strip(),
+        "status": "pending",
+        "admin_note": "",
+        "created_at": _iso(now),
+        "updated_at": _iso(now),
+    }
+    saved = await repo.create_staff_leave_request(row)
+    return {"success": True, "leave_request": saved}
 
 
 @router.post("/api/staff-leave-requests/{request_id}/decision")

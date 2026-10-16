@@ -1164,6 +1164,7 @@ class AppointmentStaffRequest(BaseModel):
     timezone: Optional[str] = None
     active: Optional[bool] = True
     round_robin_order: Optional[int] = 0
+    branch_name: Optional[str] = "ECIL / Kapra (Main Clinic)"
 
 
 class CreateAppointmentRequest(BaseModel):
@@ -1175,6 +1176,7 @@ class CreateAppointmentRequest(BaseModel):
     staff_id: Optional[str] = ""
     notes: Optional[str] = ""
     service_address: Optional[str] = ""
+    branch_name: Optional[str] = "ECIL / Kapra (Main Clinic)"
 
 
 class CrmTagRequest(BaseModel):
@@ -2392,6 +2394,7 @@ async def api_get_appointments(
     staff_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    branch_name: Optional[str] = None,
 ):
     return await get_all_appointments(
         date_filter=date,
@@ -2400,7 +2403,92 @@ async def api_get_appointments(
         staff_id=staff_id,
         date_from=date_from,
         date_to=date_to,
+        branch_name=branch_name,
     )
+
+
+@app.get("/api/appointments/stats")
+async def api_get_appointment_stats(doctor_id: Optional[str] = None, branch_name: Optional[str] = None):
+    """Return clinic appointment statistics for today, this week, this month, and total."""
+    try:
+        from datetime import datetime, date, timedelta
+        import calendar
+        from db import get_all_appointments, DEFAULT_TIMEZONE
+        from zoneinfo import ZoneInfo
+
+        today_dt = datetime.now(ZoneInfo(DEFAULT_TIMEZONE)).date()
+        today_str = today_dt.isoformat()
+
+        # Start and end of current week (Mon-Sun)
+        start_of_week = today_dt - timedelta(days=today_dt.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+
+        # Start and end of current month
+        start_of_month = today_dt.replace(day=1)
+        _, last_day = calendar.monthrange(today_dt.year, today_dt.month)
+        end_of_month = today_dt.replace(day=last_day)
+
+        all_appts = await get_all_appointments()
+
+        today_count = 0
+        week_count = 0
+        month_count = 0
+        completed_count = 0
+        in_progress_count = 0
+        booked_count = 0
+        doctor_counts = {}
+        branch_counts = {}
+
+        for a in all_appts:
+            if doctor_id and a.get("staff_id") != doctor_id:
+                continue
+            if branch_name and branch_name.strip() and branch_name.lower() not in str(a.get("branch_name") or a.get("service_address") or "").lower():
+                continue
+
+            a_date_str = str(a.get("date") or "")[:10]
+            status = str(a.get("status") or "").lower()
+            doc_name = a.get("staff_name") or "Unassigned"
+            br_name = a.get("branch_name") or "ECIL / Kapra (Main Clinic)"
+
+            doctor_counts[doc_name] = doctor_counts.get(doc_name, 0) + 1
+            branch_counts[br_name] = branch_counts.get(br_name, 0) + 1
+
+            if status in ("completed", "done"):
+                completed_count += 1
+            elif status in ("in_progress", "started"):
+                in_progress_count += 1
+            elif status in ("booked", "confirmed"):
+                booked_count += 1
+
+            if a_date_str == today_str:
+                today_count += 1
+
+            try:
+                a_d = date.fromisoformat(a_date_str)
+                if start_of_week <= a_d <= end_of_week:
+                    week_count += 1
+                if start_of_month <= a_d <= end_of_month:
+                    month_count += 1
+            except Exception:
+                pass
+
+        return {
+            "today": today_count,
+            "this_week": week_count,
+            "this_month": month_count,
+            "total": len(all_appts),
+            "completed": completed_count,
+            "in_progress": in_progress_count,
+            "booked": booked_count,
+            "by_doctor": doctor_counts,
+            "by_branch": branch_counts,
+            "date_today": today_str,
+            "week_range": f"{start_of_week.isoformat()} to {end_of_week.isoformat()}",
+            "month_name": today_dt.strftime("%B %Y"),
+        }
+    except Exception as exc:
+        logger.error(f"api_get_appointment_stats error: {exc}")
+        raise HTTPException(500, str(exc))
 
 
 @app.post("/api/appointments")
@@ -2416,6 +2504,8 @@ async def api_create_appointment(req: CreateAppointmentRequest):
             details["service_address"] = req.service_address
         if req.staff_id:
             details["staff_id"] = req.staff_id
+        if req.branch_name:
+            details["branch_name"] = req.branch_name
 
         booking_id = await insert_appointment(
             name=req.name.strip(),
@@ -9254,6 +9344,7 @@ class CreateInvoiceApiRequest(BaseModel):
     phone: str
     doctor_name: Optional[str] = "Dr. P. Sudhakar"
     doctor_id: Optional[str] = ""
+    branch_name: Optional[str] = "ECIL / Kapra (Main Clinic)"
     treatment_date: Optional[str] = None
     items: Optional[List[Dict[str, Any]]] = None
     discount: Optional[float] = 0.0
@@ -9274,6 +9365,7 @@ async def api_list_invoices(
     q: Optional[str] = None,
     status: Optional[str] = None,
     doctor_name: Optional[str] = None,
+    branch_name: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     limit: int = 50,
@@ -9285,6 +9377,7 @@ async def api_list_invoices(
             q=q,
             status=status,
             doctor_name=doctor_name,
+            branch_name=branch_name,
             date_from=date_from,
             date_to=date_to,
             limit=limit,
@@ -9339,10 +9432,11 @@ async def api_record_invoice_payment(invoice_id: str, req: RecordPaymentApiReque
 async def api_get_revenue_summary(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    branch_name: Optional[str] = None,
 ):
     from billing import get_revenue_summary
     try:
-        return await get_revenue_summary(date_from=date_from, date_to=date_to)
+        return await get_revenue_summary(date_from=date_from, date_to=date_to, branch_name=branch_name)
     except Exception as exc:
         logger.error(f"api_get_revenue_summary error: {exc}")
         raise HTTPException(500, str(exc))

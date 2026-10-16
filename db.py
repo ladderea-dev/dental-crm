@@ -987,6 +987,7 @@ async def upsert_appointment_staff(data: dict, staff_id: Optional[str] = None) -
         "timezone": timezone_name,
         "active": bool(data.get("active", True)),
         "round_robin_order": int(data.get("round_robin_order") or 0),
+        "branch_name": str(data.get("branch_name") or "ECIL / Kapra (Main Clinic)").strip(),
         "updated_at": now,
     }
     if not row["name"]:
@@ -1185,12 +1186,13 @@ async def insert_appointment(name: str, phone: str, date: str, time: str, servic
         "duration_minutes": settings["demo_duration_minutes"],
         "buffer_minutes": settings["buffer_minutes"],
         "timezone": settings["timezone"],
+        "branch_name": str(details.get("branch_name") or (staff or {}).get("branch_name") or "ECIL / Kapra (Main Clinic)").strip(),
         "created_at": datetime.now().isoformat(),
     }
     details = details or {}
     for key in (
         "service_address", "location_latitude", "location_longitude",
-        "location_name", "location_url", "intake_data",
+        "location_name", "location_url", "intake_data", "branch_name",
     ):
         if details.get(key) not in (None, "", {}):
             row[key] = details[key]
@@ -1315,14 +1317,14 @@ async def get_day_available_slots(date: str, staff_id: Optional[str] = None) -> 
     if interval <= 0:
         interval = 30
 
-    start_h, end_h = 9, 18
+    start_h, end_h = 10, 21
     target_person = None
     if staff_id:
         target_person = await get_repository().get_appointment_staff(staff_id)
         if target_person and target_person.get("start_time") and target_person.get("end_time"):
             try:
-                start_h = int(target_person["start_time"].split(":")[0])
-                end_h = int(target_person["end_time"].split(":")[0])
+                start_h = int(str(target_person["start_time"]).split(":")[0])
+                end_h = int(str(target_person["end_time"]).split(":")[0])
             except Exception:
                 pass
 
@@ -1373,6 +1375,7 @@ async def get_all_appointments(
     staff_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    branch_name: Optional[str] = None,
 ) -> list:
     status_groups = {
         "active": ["pending", "confirmed", "booked", "in_progress"],
@@ -1393,6 +1396,10 @@ async def get_all_appointments(
     if search_query:
         sq = search_query.lower()
         rows = [r for r in rows if sq in (r.get("name") or "").lower() or sq in (r.get("phone") or "").lower()]
+
+    if branch_name:
+        bn = branch_name.lower().strip()
+        rows = [r for r in rows if bn in (r.get("branch_name") or "").lower()]
 
     return rows
 
