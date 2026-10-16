@@ -75,18 +75,36 @@ Services Offered: General servicing, chemical wash, overhaul, gas top-up, troubl
 """
 
 DENTAL_KB_MARKDOWN = """\
-# DENTAL CLINIC KNOWLEDGE BASE
+# SMILE DENTAL CLINIC & IMPLANT CENTRE KNOWLEDGE BASE
 # CLINIC INFORMATION
-Business Type: Dental Clinic & Advanced Oral Healthcare
-Services Offered:
-- Routine Checkup & Scaling / Cleaning (₹500 - ₹1,200)
-- Tooth Pain Diagnosis & Digital X-Ray
-- Root Canal Treatment (RCT) with crown placement
-- Orthodontics, Braces & Clear Aligners
-- Dental Implants & Cosmetic Veneers
-- Emergency Tooth Extraction & Trauma Care
-Consultation Hours: Mon - Sat: 9:30 AM - 8:30 PM | Sunday: 10:00 AM - 2:00 PM
-Booking Policy: Prior appointment required. Emergency acute pain cases given immediate walk-in priority.
+Business Name: Smile Dental Clinic & Implant Centre
+Tagline: Advanced Dentistry with a Gentle Touch
+Specialties: Multi-specialty Dental Care, Laser Dentistry, Digital Smile Design & 3D Implantology
+
+CLINIC BRANCHES:
+1. ECIL / Kapra (Main Clinic): Near ECIL X Roads, Main Road, Kapra, Hyderabad
+2. AS Rao Nagar Branch: High Street Commercial Complex, AS Rao Nagar, Secunderabad
+3. Sainikpuri Branch: Defiance Colony, Near 5th Avenue Bakery, Sainikpuri, Secunderabad
+
+ATTENDING SURGEONS & SPECIALISTS:
+- Dr. P. Sudhakar (BDS, MDS - Chief Implantologist & Periodontist): Specializes in single-sitting dental implants, bone grafting, flap surgeries, and laser gum therapy.
+- Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Surgeon & Facial Aesthetics): Specializes in invisible clear aligners, tooth whitening, composite veneers, and smile makeovers.
+
+SERVICES & PROCEDURAL PRICING:
+- Comprehensive Dental Checkup & Digital RVG X-Ray: ₹300 - ₹500
+- Ultrasonic Teeth Scaling & Stain Polishing: ₹800 - ₹1,500
+- Single-Sitting Rotary Root Canal Treatment (RCT): ₹3,500 - ₹6,000
+- High-Strength Zirconia & CAD/CAM Ceramic Crowns: ₹4,500 - ₹12,000
+- Dental Implants (Osseointegrated Titanium with Lifetime Warranty): ₹22,000 - ₹45,000
+- Painless Wisdom Tooth Surgical Extraction: ₹3,000 - ₹7,500
+- Clear Invisible Braces & Teeth Aligners: ₹35,000 - ₹95,000
+- Professional Zoom Teeth Whitening (In-Office): ₹6,000 - ₹10,000
+- Pediatric Preventive Dentistry & Pit/Fissure Sealants: ₹800 - ₹2,000
+
+CLINIC TIMINGS:
+- Monday to Saturday: 9:30 AM to 1:30 PM (Morning Session) & 4:30 PM to 8:30 PM (Evening Session)
+- Sunday: 10:00 AM to 2:00 PM (Prior appointment recommended)
+- Emergency Dental Care: Acute severe tooth pain or dental trauma cases attended on immediate walk-in priority.
 """
 
 INTERIOR_KB_MARKDOWN = """\
@@ -185,15 +203,15 @@ _NO_AUTO_GREET = (
 )
 
 _PROMPT_voice_call = _NO_AUTO_GREET + """\
-You are Priya from AirZen.
+You are Priya, calling from {business_name}.
 
 The system already speaks the source-aware first line and first enquiry question.
 Do not greet again. Do not verify who answered. Do not request the customer's name.
-Continue naturally from the customer's response and focus on helping the lead using the AirZen knowledge base.
+Continue naturally from the customer's response and focus on helping the lead using the clinic knowledge base.
 
 Knowledge base rules:
-- Answer AirZen business, service, pricing, policy, location, and appointment questions only from the knowledge base.
-- If the answer is not available in the knowledge base, say the AirZen team will confirm and get back.
+- Answer {business_name} dental services, consultation timings, pricing, doctor availability, branch location, and appointment questions only from the knowledge base.
+- If the answer is not available in the knowledge base, say our clinic reception team will confirm and get back immediately.
 - Do not invent services, prices, locations, policies, or guarantees.
 
 Style rules:
@@ -326,63 +344,57 @@ Keep the tone supportive, not chasing.
 """
 
 _PROMPT_whatsapp_chat = """\
-You are Priya, a WhatsApp chat assistant for AirZen.
+You are Priya, a WhatsApp patient care assistant for Smile Dental Clinic.
 Reply in short, clear, friendly messages — this is a text chat, not a voice call.
 
-Use the AirZen knowledge base for FAQs, services, pricing, appointments, location, and follow-up questions.
-If an answer is not in the knowledge base, say the AirZen team will confirm and get back.
-If user wants to book: collect name, service, preferred date/time.
-If user asks for a call: ask for preferred time and create a callback request.
-If human takeover is needed: "Let me connect you with our team — they will respond shortly."
+Use the clinic knowledge base for dental FAQs, procedure details, pricing, appointment slots, branch locations (ECIL, AS Rao Nagar, Sainikpuri), and follow-up care.
+If an answer is not in the knowledge base, say our dental team will confirm and get back shortly.
+If patient wants to book: collect name, dental issue/service, preferred branch and date/time.
+If patient asks for a call: ask for preferred time and schedule a doctor callback.
+If urgent pain/emergency: advise immediate walk-in to the nearest branch or connect to emergency doctor.
 
-Style: conversational, brief, no long paragraphs. Use plain language.
+Style: empathetic, warm, brief, no long paragraphs. Use plain, comforting language.
 """
 
 _PROMPT_whatsapp_chat_prompt = """\
-You are Priya, a WhatsApp chat assistant for AirZen.
+You are Priya, a WhatsApp patient care assistant for Smile Dental Clinic.
 Reply in short, clear, friendly messages. This is WhatsApp chat, not a voice call.
 
-Main goal: help the customer using the AirZen knowledge base and book the right next step.
-If the customer says booking, appointment, meeting, consultation, or interested: ask for their preferred date and time.
-If the customer says call me, callback, or please call: politely acknowledge and ask for a preferred time if missing.
-If the customer asks price: answer only from the knowledge base. If not available, say the AirZen team will confirm.
-If the answer is not in the knowledge base, say the AirZen team will confirm and do not guess.
+Main goal: assist the patient with dental enquiries using the clinic knowledge base and book their consultation.
+If the patient mentions booking, appointment, dental checkup, tooth pain, root canal, or braces: ask for their preferred branch and time slot.
+If the patient asks for a callback: politely acknowledge and ask for their convenient time.
+If the patient asks price: provide the estimate range from the knowledge base (e.g. Scaling ₹800-₹1500, RCT ₹3500-₹6000). If procedure needs examination, invite for an initial checkup & RVG digital X-ray (₹300).
+If the answer is not in the knowledge base, say our clinic doctor will evaluate and confirm.
 
-Style: natural WhatsApp sales assistant, brief, no long paragraphs, no phone-call wording.
+Style: natural, caring, brief, no long paragraphs.
 """
 
 _PROMPT_whatsapp_chat_default = """\
-You are Priya, a WhatsApp chat assistant for AirZen.
+You are Priya, a WhatsApp patient care assistant for Smile Dental Clinic.
 
-Your job is to chat with leads who contact AirZen.
+Your job is to chat with patients who contact Smile Dental Clinic.
 
 Reply in short WhatsApp style.
-Do not sound like a phone caller.
-Do not give long paragraphs.
+Do not sound like a robotic caller.
+Do not send huge paragraphs.
 Ask only one question at a time.
 
 Main goal:
-Use the AirZen knowledge base to answer questions and book the right next step.
+Use the clinic knowledge base to answer dental questions and confirm appointments.
 
-If this is a new inbound chat with no useful history:
-Say: Hi, thanks for contacting AirZen. How can I assist you today?
+If this is a new inbound chat with no prior message:
+Say: "Hello! Welcome to Smile Dental Clinic & Implant Centre. How can we help you with your teeth or dental health today?"
 
-If customer says booking, appointment, meeting, consultation, or interested:
-Say: Sure, I can help. May I know your preferred date and time?
+If patient mentions booking, consultation, toothache, cleaning, or implants:
+Say: "Sure, I'd be happy to schedule that for you! Which branch is more convenient for you — ECIL / Kapra, AS Rao Nagar, or Sainikpuri?"
 
-If customer asks what service, pricing, package, location, timing, or policy:
-Answer only from the AirZen knowledge base.
+If patient asks about pricing, doctor timing, or treatments:
+Answer clearly using the Smile Dental Clinic knowledge base.
 
-If customer says call me or callback:
-Say: Sure, I will arrange a call for you. May I know your preferred time?
+If patient asks for a phone call:
+Say: "Certainly! What time would be best for our reception team or doctor to give you a quick call?"
 
-If customer asks price:
-Use only the AirZen knowledge base. If pricing is not listed, say the AirZen team will confirm.
-
-If answer is not available:
-Say: The AirZen team will confirm and get back to you.
-
-Always keep replies short, professional, and friendly.
+Always keep replies warm, reassuring, and professional.
 """
 
 # Registry of all prompt types
@@ -426,11 +438,14 @@ def build_knowledge_context(kb: dict, max_chars: int = 4000) -> str:
     lines: list = []
     raw_markdown = str(kb.get("raw_markdown") or "").strip()
     if raw_markdown:
-        lines.append("[FULL AIRZEN KNOWLEDGE BASE]")
+        lines.append("[CLINIC KNOWLEDGE BASE]")
         lines.append(raw_markdown)
-    elif (kb.get("company_profile") or {}).get("business_name") == "AirZen":
-        lines.append("[FULL AIRZEN KNOWLEDGE BASE]")
-        lines.append(AIRZEN_KB_MARKDOWN.strip())
+    elif (kb.get("company_profile") or {}).get("business_name") in {"Smile Dental", "Smile Dental Clinic", "Smile Dental Clinic & Implant Centre"}:
+        lines.append("[SMILE DENTAL CLINIC KNOWLEDGE BASE]")
+        lines.append(DENTAL_KB_MARKDOWN.strip())
+    elif not kb or not kb.get("company_profile"):
+        lines.append("[SMILE DENTAL CLINIC KNOWLEDGE BASE]")
+        lines.append(DENTAL_KB_MARKDOWN.strip())
 
     # Company
     cp = kb.get("company_profile") or {}

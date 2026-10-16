@@ -273,8 +273,14 @@ except ImportError:
     _scheduler = None
     logger.warning("APScheduler not installed — campaign scheduling disabled")
 
-app = FastAPI(title="AirZen Secure Staff CRM Portal", version="1.0.0")
+app = FastAPI(title="Smile Dental Clinic & Staff CRM Portal", version="2.0.0")
 app.include_router(staff_mobile_router)
+from dental_lab import router as dental_lab_router
+app.include_router(dental_lab_router)
+from treatment_plans import router as treatment_plans_router
+app.include_router(treatment_plans_router)
+from dental_care import router as dental_care_router
+app.include_router(dental_care_router)
 
 SESSION_COOKIE_NAME = "aicalling_admin_session"
 SESSION_TTL_SECONDS = 12 * 60 * 60

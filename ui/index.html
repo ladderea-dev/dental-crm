@@ -827,6 +827,144 @@ tr.lead-row:hover{background:rgba(255,255,255,0.02)}
     <div id="billing-invoices-table" style="margin-top:10px;overflow-x:auto"></div>
   </div>
 </section>
+<section id="treatment-plans" class="panel">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">🦷 Multi-Sitting Dental Treatment Plans</h2>
+        <p class="muted" style="margin:4px 0 0">Track multi-stage procedures (Root Canals, Dental Implants, Smile Makeovers, Orthodontics) with sitting progress, doctor notes, and prescriptions.</p>
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="primary" onclick="openCreateTreatmentPlanModal()" style="font-weight:700">➕ New Treatment Plan</button>
+        <button onclick="loadTreatmentPlansUI()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Treatment KPI Cards -->
+    <div class="grid cols-3" style="margin-top:16px;gap:12px">
+      <div class="card" style="padding:14px;border:1px solid var(--border)">
+        <div class="muted" style="font-size:0.8rem;font-weight:600">🦷 Total Treatment Plans</div>
+        <div id="tp-kpi-total" class="kpi" style="font-size:26px;color:var(--primary);margin:4px 0">0</div>
+        <div class="muted" style="font-size:0.75rem">All clinical cases across branches</div>
+      </div>
+      <div class="card" style="padding:14px;border:1px solid var(--border)">
+        <div class="muted" style="font-size:0.8rem;font-weight:600">⏳ Active / In-Progress</div>
+        <div id="tp-kpi-active" class="kpi" style="font-size:26px;color:#f59e0b;margin:4px 0">0</div>
+        <div class="muted" style="font-size:0.75rem">Pending subsequent dental sittings</div>
+      </div>
+      <div class="card" style="padding:14px;border:1px solid var(--border)">
+        <div class="muted" style="font-size:0.8rem;font-weight:600">✅ Fully Completed</div>
+        <div id="tp-kpi-completed" class="kpi" style="font-size:26px;color:#10b981;margin:4px 0">0</div>
+        <div class="muted" style="font-size:0.75rem">All planned sittings finalized</div>
+      </div>
+    </div>
+
+    <!-- Filter Toolbar -->
+    <div class="card" style="margin-top:16px;padding:12px;background:color-mix(in srgb,var(--card) 92%,var(--input) 8%)">
+      <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+        <select id="tp-filter-branch" onchange="loadTreatmentPlansUI()" style="flex:1;min-width:160px">
+          <option value="">All Clinic Branches</option>
+          <option value="ECIL / Kapra (Main Clinic)">ECIL / Kapra (Main Clinic)</option>
+          <option value="AS Rao Nagar Branch">AS Rao Nagar Branch</option>
+          <option value="Sainikpuri Branch">Sainikpuri Branch</option>
+        </select>
+        <select id="tp-filter-status" onchange="loadTreatmentPlansUI()" style="width:160px">
+          <option value="">All Statuses</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="paused">Paused</option>
+        </select>
+        <select id="tp-filter-doctor" onchange="loadTreatmentPlansUI()" style="flex:1;min-width:160px">
+          <option value="">All Doctors</option>
+          <option value="Dr. P. Sudhakar (BDS, MDS - Implantologist & Periodontist)">Dr. P. Sudhakar</option>
+          <option value="Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Surgeon)">Dr. K. Mounika</option>
+        </select>
+        <input id="tp-filter-phone" placeholder="Search by phone..." oninput="loadTreatmentPlansUI()" style="width:180px">
+        <button onclick="loadTreatmentPlansUI()">Filter</button>
+      </div>
+    </div>
+
+    <!-- Treatment Plans Table -->
+    <div class="row" style="margin-top:20px;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Active Clinical Treatment Plans</h3>
+      <span id="tp-plans-count" class="muted" style="font-size:0.85rem">0 plans</span>
+    </div>
+    <div id="tp-plans-table" style="margin-top:10px;overflow-x:auto"></div>
+  </div>
+</section>
+<section id="dental-lab" class="panel">
+  <div class="card">
+
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="display:flex;align-items:center;gap:8px">🔬 Dental Laboratory Tracker</h2>
+        <p class="muted" style="margin:4px 0 0">Track prosthetic crowns, bridges, veneers, aligners, and dentures sent to dental labs across clinic branches.</p>
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="primary" onclick="openCreateLabOrderModal()" style="font-weight:700">➕ New Dental Lab Order</button>
+        <button onclick="loadDentalLabOrdersUI()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Lab KPI Cards -->
+    <div id="lab-kpis" class="grid cols-4" style="margin-top:16px;gap:12px">
+      <div class="card" style="padding:14px;border:1px solid var(--border)">
+        <div class="muted" style="font-size:0.8rem;font-weight:600">📦 In Fabrication</div>
+        <div id="lab-kpi-fabrication" class="kpi" style="font-size:26px;color:var(--primary);margin:4px 0">0</div>
+        <div class="muted" style="font-size:0.75rem">Under fabrication at lab</div>
+      </div>
+      <div class="card" style="padding:14px;border:1px solid var(--border)">
+        <div class="muted" style="font-size:0.8rem;font-weight:600">🏥 Arrived at Clinic</div>
+        <div id="lab-kpi-arrived" class="kpi" style="font-size:26px;color:#10b981;margin:4px 0">0</div>
+        <div class="muted" style="font-size:0.75rem">Ready for trial / cementation</div>
+      </div>
+      <div class="card" style="padding:14px;border:1px solid var(--border)">
+        <div class="muted" style="font-size:0.8rem;font-weight:600">✅ Completed / Fitted</div>
+        <div id="lab-kpi-cemented" class="kpi" style="font-size:26px;color:#0284c7;margin:4px 0">0</div>
+        <div class="muted" style="font-size:0.75rem">Cemented in patient mouth</div>
+      </div>
+      <div class="card" style="padding:14px;border:1px solid var(--border)">
+        <div class="muted" style="font-size:0.8rem;font-weight:600">💰 Lab Margin (₹)</div>
+        <div id="lab-kpi-margin" class="kpi" style="font-size:24px;color:#059669;margin:4px 0">₹0</div>
+        <div class="muted" style="font-size:0.75rem">Gross profit on prosthetics</div>
+      </div>
+    </div>
+
+    <!-- Filter Toolbar -->
+    <div class="card" style="margin-top:16px;padding:12px;background:color-mix(in srgb,var(--card) 92%,var(--input) 8%)">
+      <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+        <select id="lab-filter-branch" onchange="loadDentalLabOrdersUI()" style="flex:1;min-width:160px">
+          <option value="">All Clinic Branches</option>
+          <option value="ECIL / Kapra (Main Clinic)">ECIL / Kapra (Main Clinic)</option>
+          <option value="AS Rao Nagar Branch">AS Rao Nagar Branch</option>
+          <option value="Sainikpuri Branch">Sainikpuri Branch</option>
+        </select>
+        <select id="lab-filter-status" onchange="loadDentalLabOrdersUI()" style="width:160px">
+          <option value="">All Lab Statuses</option>
+          <option value="sent_to_lab">Sent to Lab</option>
+          <option value="in_fabrication">In Fabrication</option>
+          <option value="received_at_clinic">Received at Clinic</option>
+          <option value="trial_fitted">Trial Fitted</option>
+          <option value="cemented_done">Cemented / Completed</option>
+          <option value="remake_required">Remake Required</option>
+        </select>
+        <select id="lab-filter-doctor" onchange="loadDentalLabOrdersUI()" style="flex:1;min-width:160px">
+          <option value="">All Attending Doctors</option>
+          <option value="Dr. P. Sudhakar (BDS, MDS - Implantologist & Periodontist)">Dr. P. Sudhakar</option>
+          <option value="Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Surgeon)">Dr. K. Mounika</option>
+        </select>
+        <button onclick="loadDentalLabOrdersUI()">Filter</button>
+      </div>
+    </div>
+
+    <!-- Lab Orders Table -->
+    <div class="row" style="margin-top:20px;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Active Prosthetic &amp; Lab Orders</h3>
+      <span id="lab-orders-count" class="muted" style="font-size:0.85rem">0 orders</span>
+    </div>
+    <div id="lab-orders-table" style="margin-top:10px;overflow-x:auto"></div>
+  </div>
+</section>
 <section id="batch-monitor" class="panel"><div class="card"><h2>📡 Batch Call Monitor</h2><div id="bm-status-bar" class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:12px"></div><div id="bm-stats" class="grid cols-4" style="margin-bottom:12px"></div><div id="bm-window-warn" style="display:none;padding:10px;background:color-mix(in srgb,var(--danger) 12%,var(--card));border:1px solid color-mix(in srgb,var(--danger) 55%,transparent);border-radius:8px;margin-bottom:10px;color:var(--danger)"></div><div class="row" style="gap:8px"><button id="bm-pause-btn" class="warn" onclick="batchAction('paused')">⏸ Pause</button><button id="bm-resume-btn" class="primary" onclick="batchAction('running')">▶ Resume</button><button id="bm-stop-btn" class="danger" onclick="batchAction('stopped')">⏹ Stop</button><button onclick="refreshBatchMonitor()">🔄 Refresh</button></div><div id="bm-items" style="margin-top:12px"></div></div></section>
 <section id="scheduled" class="panel"><div class="card"><h2>📅 Scheduled Calls</h2><div id="sched-window-bar" style="padding:8px 14px;border-radius:8px;margin-bottom:12px;font-weight:600"></div><div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" onclick="startDueTodayCalls()">🔥 Start Due Today Calls</button><button onclick="loadScheduledCalls()">🔄 Refresh</button></div><div class="grid cols-3" id="sched-counts" style="margin-bottom:12px"></div><h3 style="margin-top:8px">Due Today</h3><div id="sched-due-today"></div><h3 style="margin-top:8px">Overdue</h3><div id="sched-overdue"></div><h3 style="margin-top:8px">Upcoming Today</h3><div id="sched-upcoming"></div></div></section>
 <section id="calls" class="panel"><div class="card"><h2>📝 Call Logs</h2><div class="row"><button class="primary" onclick="exportCalls('xlsx')">Export Excel</button><button onclick="exportCalls('csv')">Export CSV</button></div><div id="calls-list"></div><div class="row"><button onclick="loadCalls(callPage-1)">Prev</button><span id="call-page"></span><button onclick="loadCalls(callPage+1)">Next</button></div></div></section>
@@ -1422,6 +1560,7 @@ tr.lead-row:hover{background:rgba(255,255,255,0.02)}
   <button class="kb-tab-btn" onclick="waSwitchTab('send')">📤 Send Test</button>
   <button class="kb-tab-btn" onclick="waSwitchTab('logs')">📋 Logs</button>
   <button class="kb-tab-btn" onclick="waSwitchTab('health')">❤️ Health</button>
+  <button class="kb-tab-btn" onclick="waSwitchTab('dental-care')">🦷 Post-Op &amp; Recalls</button>
 </div>
 
 <!-- INBOX -->
@@ -1662,6 +1801,109 @@ tr.lead-row:hover{background:rgba(255,255,255,0.02)}
     </div>
   </div>
 </div>
+
+<!-- DENTAL CARE & 6-MONTH RECALLS -->
+<div class="kb-panel" id="wap-dental-care">
+  <div class="grid cols-2" style="gap:16px;align-items:start">
+    <!-- Left Column: Immediate Post-Op Care Instructions -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="margin:0;display:flex;align-items:center;gap:6px">📋 Immediate Post-Op Care Dispatch</h3>
+          <p class="muted" style="margin:4px 0 0;font-size:0.83rem">Send structured clinical care instructions to patient WhatsApp immediately following procedure.</p>
+        </div>
+        <span class="badge" style="background:#e0f2fe;color:#0369a1">WhatsApp Clinical</span>
+      </div>
+
+      <form id="post-op-care-form" onsubmit="submitSendPostOp(event)" style="margin-top:14px">
+        <div class="grid cols-2" style="gap:10px">
+          <div>
+            <label style="font-weight:600;font-size:0.83rem">Patient Name *</label>
+            <input id="postop-patient-name" required placeholder="e.g. K. Rajesh Kumar" oninput="updatePostOpPreview()">
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:0.83rem">Patient Phone (with +91) *</label>
+            <input id="postop-patient-phone" required placeholder="e.g. +919876543210">
+          </div>
+        </div>
+
+        <div class="grid cols-2" style="gap:10px;margin-top:10px">
+          <div>
+            <label style="font-weight:600;font-size:0.83rem">Clinical Procedure / Protocol *</label>
+            <select id="postop-protocol-type" onchange="updatePostOpPreview()" required>
+              <option value="extraction">🦷 Tooth Extraction / Impaction Surgery</option>
+              <option value="implant">🔩 Dental Implant Placement</option>
+              <option value="rct">⚡ Root Canal Treatment (RCT)</option>
+              <option value="scaling">✨ Ultrasonic Scaling &amp; Root Planing</option>
+              <option value="whitening">💎 Professional Teeth Whitening</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-weight:600;font-size:0.83rem">Attending Surgeon *</label>
+            <select id="postop-doctor-name" onchange="updatePostOpPreview()">
+              <option value="Dr. P. Sudhakar (BDS, MDS - Implantologist & Periodontist)">Dr. P. Sudhakar (BDS, MDS)</option>
+              <option value="Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Surgeon)">Dr. K. Mounika (BDS, PGDCC)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:10px">
+          <label style="font-weight:600;font-size:0.83rem">Clinic Branch *</label>
+          <select id="postop-branch-name" onchange="updatePostOpPreview()">
+            <option value="ECIL / Kapra (Main Clinic)">ECIL / Kapra (Main Clinic)</option>
+            <option value="AS Rao Nagar Branch">AS Rao Nagar Branch</option>
+            <option value="Sainikpuri Branch">Sainikpuri Branch</option>
+          </select>
+        </div>
+
+        <!-- Live WhatsApp Message Preview -->
+        <div style="margin-top:14px">
+          <label style="font-weight:600;font-size:0.83rem">WhatsApp Message Preview:</label>
+          <div id="postop-message-preview" style="margin-top:4px;padding:12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:0.85rem;white-space:pre-wrap;font-family:sans-serif;max-height:220px;overflow-y:auto;color:#14532d"></div>
+        </div>
+
+        <div class="row" style="margin-top:14px;justify-content:flex-end">
+          <button type="submit" class="primary" style="font-weight:700">🚀 Send Post-Op Care via WhatsApp</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Column: Automated 6-Month Dental Recall Engine -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <h3 style="margin:0;display:flex;align-items:center;gap:6px">📅 6-Month Dental Recall Engine</h3>
+          <p class="muted" style="margin:4px 0 0;font-size:0.83rem">Patients due for routine cleaning &amp; preventive dental checkup (5-6 months since last visit).</p>
+        </div>
+        <button onclick="loadDentalRecallsUI()">🔄 Check Due Recalls</button>
+      </div>
+
+      <!-- Recall Filter Bar -->
+      <div class="row" style="margin-top:12px;gap:8px;align-items:center">
+        <select id="recall-filter-branch" onchange="loadDentalRecallsUI()" style="flex:1">
+          <option value="">All Branches</option>
+          <option value="ECIL / Kapra (Main Clinic)">ECIL / Kapra (Main Clinic)</option>
+          <option value="AS Rao Nagar Branch">AS Rao Nagar Branch</option>
+          <option value="Sainikpuri Branch">Sainikpuri Branch</option>
+        </select>
+        <select id="recall-filter-days" onchange="loadDentalRecallsUI()" style="width:170px">
+          <option value="150" selected>Due (>= 5 Months)</option>
+          <option value="180">Due (>= 6 Months)</option>
+          <option value="365">Overdue (>= 1 Year)</option>
+        </select>
+      </div>
+
+      <div class="row" style="margin-top:14px;justify-content:space-between;align-items:center">
+        <span id="recall-count-label" class="muted" style="font-weight:600;font-size:0.85rem">0 patients due</span>
+        <button id="recall-batch-btn" class="primary" style="font-size:0.82rem;padding:4px 10px;display:none" onclick="dispatchAllDueRecalls()">
+          📢 Send Recall to All Due
+        </button>
+      </div>
+
+      <div id="recall-patients-list" style="margin-top:10px;max-height:420px;overflow-y:auto"></div>
+    </div>
+  </div>
+</div>
 </section>
 
 <!-- Shared modal container used by CRM lead detail, batch monitor, etc. -->
@@ -1747,13 +1989,13 @@ function showInlineMessage(id,msg,type='err'){const el=$(id);if(el){el.innerHTML
 function showLogin(msg=''){closeMobileMenu();const el=$('login-error');if(el){el.textContent=msg;const t=String(msg).trim();el.style.display=(t===''||t==='{}')?'none':'';}document.body.classList.remove('authenticated')}
 function showDashboard(){document.body.classList.add('authenticated');const role=window._currentUserRole||'admin';const isTelecallerOnly=(role==='telecaller');['settings','costs','broadcast','logs','setup','campaigns','agents','prompt','automation'].forEach(t=>{document.querySelectorAll(`[data-tab="${t}"]`).forEach(btn=>btn.style.display=isTelecallerOnly?'none':'')});if(isTelecallerOnly){switchTab('telecaller')}else{try{loadStats()}catch(e){}try{loadCalls()}catch(e){}try{loadAppointments()}catch(e){}try{loadLogs()}catch(e){}try{loadAgentProfiles()}catch(e){}}}
 async function checkAuth(){try{const r=await api('/api/auth/me');if(r.authenticated){window._currentUser=r.username||'admin';window._currentUserRole=r.role||'admin';showDashboard()}else{showLogin(r.error||'')}}catch(e){showLogin(e.message||'')}}
-const sidebarIcons={stats:'📊',telecaller:'🎧',single:'📞',batch:'📋','batch-monitor':'📡',campaigns:'🚀',scheduled:'📅',agents:'🤖',prompt:'✏️',kb:'📚',automation:'⚡',whatsapp:'💬','staff-ops':'🩺',appointments:'🦷',billing:'💳',calls:'📝',crm:'👥',kanban:'▦',reports:'📈',costs:'₹',broadcast:'📣',handoffs:'🤝',settings:'⚙️',logs:'📋',setup:'🔧'};
-const tabs=[['stats','📊 Stats'],['telecaller','🎧 Telecaller'],['single','📞 Single Call'],['batch','📋 Batch Call'],['batch-monitor','📡 Batch Monitor'],['campaigns','🚀 Campaigns'],['scheduled','📅 Scheduled Calls'],['agents','🤖 Agents'],['prompt','✏️ AI Prompt'],['kb','📚 Knowledge Base'],['automation','⚡ Automation'],['whatsapp','💬 WhatsApp'],['staff-ops','🩺 Doctor Operations'],['appointments','🦷 Doctor Appointments'],['billing','💳 Billing & Revenue'],['calls','📝 Call Logs'],['crm','👥 CRM'],['kanban','Pipeline'],['reports','Reports'],['costs','Costs'],['broadcast','Broadcast'],['handoffs','Handoffs'],['settings','⚙️ Settings'],['logs','📋 Logs'],['setup','🔧 Setup']];
+const sidebarIcons={stats:'📊',telecaller:'🎧',single:'📞',batch:'📋','batch-monitor':'📡',campaigns:'🚀',scheduled:'📅',agents:'🤖',prompt:'✏️',kb:'📚',automation:'⚡',whatsapp:'💬','staff-ops':'🩺',appointments:'📅','treatment-plans':'🦷',billing:'💳','dental-lab':'🔬',calls:'📝',crm:'👥',kanban:'▦',reports:'📈',costs:'₹',broadcast:'📣',handoffs:'🤝',settings:'⚙️',logs:'📋',setup:'🔧'};
+const tabs=[['stats','📊 Stats'],['telecaller','🎧 Telecaller'],['single','📞 Single Call'],['batch','📋 Batch Call'],['batch-monitor','📡 Batch Monitor'],['campaigns','🚀 Campaigns'],['scheduled','📅 Scheduled Calls'],['agents','🤖 Agents'],['prompt','✏️ AI Prompt'],['kb','📚 Knowledge Base'],['automation','⚡ Automation'],['whatsapp','💬 WhatsApp'],['staff-ops','🩺 Doctor Operations'],['appointments','📅 Doctor Appointments'],['treatment-plans','🦷 Treatment Plans'],['billing','💳 Billing & Revenue'],['dental-lab','🔬 Dental Lab Tracker'],['calls','📝 Call Logs'],['crm','👥 CRM'],['kanban','Pipeline'],['reports','Reports'],['costs','Costs'],['broadcast','Broadcast'],['handoffs','Handoffs'],['settings','⚙️ Settings'],['logs','📋 Logs'],['setup','🔧 Setup']];
 function scheduleLogsRefresh(){setInterval(()=>{if(!logsPaused&&document.body.classList.contains('authenticated'))try{loadLogs()}catch(e){}},8000)}
 async function loadLeadStatuses(){try{const r=await api('/api/crm/statuses');leadStatuses=Array.isArray(r)?r:(r.data||[]);}catch(e){leadStatuses=[]}}
 async function logout(){closeMobileMenu();document.querySelectorAll('[data-tab]').forEach(btn=>btn.style.display='');await fetch('/api/auth/logout',{method:'POST'});showLogin('')}
 let _staffOpsTimer=null;
-function switchTab(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===name));syncMobileMenuActive(name);if(_staffOpsTimer){clearInterval(_staffOpsTimer);_staffOpsTimer=null}if(name==='stats')loadStats();if(name==='telecaller')loadTelecallerWorkspace();if(name==='campaigns'){loadCampaigns();_startCampaignProgressPoll()}if(name==='batch-monitor')refreshBatchMonitor();if(name==='scheduled')loadScheduledCalls();if(name==='agents')loadAgentProfiles();if(name==='prompt'){initPromptManager();}if(name==='kb')initKB();if(name==='automation')initAutomation();if(name==='whatsapp')initWhatsApp();if(name==='staff-ops'){loadStaffOperations();_staffOpsTimer=setInterval(loadStaffOperations,30000)}if(name==='appointments')loadAppointments();if(name==='billing')loadBillingRevenueUI();if(name==='calls')loadCalls();if(name==='crm')loadCRM();if(name==='kanban')loadKanban();if(name==='reports')loadReports();if(name==='costs')loadCosts();if(name==='broadcast'){loadBroadcastConfig();loadBroadcastCampaigns();}if(name==='handoffs')loadHandoffs();if(name==='settings'){loadSettings();loadOutboundSchedule();loadUsersUI();}if(name==='setup')initCustomerSetup();if(name==='logs')loadLogs()}
+function switchTab(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===name));syncMobileMenuActive(name);if(_staffOpsTimer){clearInterval(_staffOpsTimer);_staffOpsTimer=null}if(name==='stats')loadStats();if(name==='telecaller')loadTelecallerWorkspace();if(name==='campaigns'){loadCampaigns();_startCampaignProgressPoll()}if(name==='batch-monitor')refreshBatchMonitor();if(name==='scheduled')loadScheduledCalls();if(name==='agents')loadAgentProfiles();if(name==='prompt'){initPromptManager();}if(name==='kb')initKB();if(name==='automation')initAutomation();if(name==='whatsapp')initWhatsApp();if(name==='staff-ops'){loadStaffOperations();_staffOpsTimer=setInterval(loadStaffOperations,30000)}if(name==='appointments')loadAppointments();if(name==='treatment-plans')loadTreatmentPlansUI();if(name==='billing')loadBillingRevenueUI();if(name==='dental-lab')loadDentalLabOrdersUI();if(name==='calls')loadCalls();if(name==='crm')loadCRM();if(name==='kanban')loadKanban();if(name==='reports')loadReports();if(name==='costs')loadCosts();if(name==='broadcast'){loadBroadcastConfig();loadBroadcastCampaigns();}if(name==='handoffs')loadHandoffs();if(name==='settings'){loadSettings();loadOutboundSchedule();loadUsersUI();}if(name==='setup')initCustomerSetup();if(name==='logs')loadLogs()}
 function _chartOptions(type){
   const c=getThemeChartColors();
   const common={
@@ -2464,7 +2706,7 @@ async function saveWaTemplates(){try{const r=await api('/api/whatsapp/templates'
 async function waGenerateDefaultTemplates(){try{const r=await api('/api/whatsapp/templates/generate-defaults',{method:'POST'});_waTemplates=r.templates||[];waRenderTemplateManager();toast('Default templates generated')}catch(e){const m=metaApiMessage(e)||e.message;showErr('wa-templates-msg',m);toast(m,'err')}}
 async function waSyncTemplatesFromMeta(){try{const r=await api('/api/whatsapp/templates/sync-meta',{method:'POST'});_waTemplates=r.templates||_waTemplates;waRenderTemplateManager();const m=r.ok?`Synced ${r.synced||0} templates`:(metaApiMessage(r)||r.reason||'Sync skipped');showErr('wa-templates-msg',m);const msg=$('wa-templates-msg');if(msg)msg.className=r.ok?'ok':'err';toast(m,r.ok?'ok':'err')}catch(e){const m=metaApiMessage(e)||e.message;showErr('wa-templates-msg',m);toast(m,'err')}}
 async function waCreateTemplateInMeta(i){const t=_waTemplates[i];if(!t){return}try{await saveWaTemplates();const r=await api('/api/whatsapp/templates/create-meta',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({purpose:t.purpose,language:t.language})});if(r.template){_waTemplates[i]=r.template;waRenderTemplateManager()}const m=r.ok?'Template sent to Meta':(metaApiMessage(r)||r.reason||'Meta create skipped');showErr('wa-templates-msg',m);const msg=$('wa-templates-msg');if(msg)msg.className=r.ok?'ok':'err';toast(m,r.ok?'ok':'err')}catch(e){const m=metaApiMessage(e)||e.message;showErr('wa-templates-msg',m);toast(m,'err')}}
-function waSwitchTab(name){document.querySelectorAll('#whatsapp .kb-tab-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes("'"+name+"'")));document.querySelectorAll('#whatsapp .kb-panel').forEach(p=>p.classList.toggle('active',p.id==='wap-'+name));if(name==='inbox'){loadWaConversations();_startWaPolling();}if(name==='logs')loadWaLogs();if(name==='health'){loadWaHealth(true);waHealthLoadRecipients()}}
+function waSwitchTab(name){document.querySelectorAll('#whatsapp .kb-tab-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes("'"+name+"'")));document.querySelectorAll('#whatsapp .kb-panel').forEach(p=>p.classList.toggle('active',p.id==='wap-'+name));if(name==='inbox'){loadWaConversations();_startWaPolling();}if(name==='logs')loadWaLogs();if(name==='health'){loadWaHealth(true);waHealthLoadRecipients()}if(name==='dental-care')loadDentalCareUI()}
 async function initWhatsApp(){await loadRuntimeTimezones();try{_waSettings=await api('/api/whatsapp/settings');_waTemplates=_waSettings.templates||[];_WA_SETTINGS_KEYS.forEach(k=>{const el=$('wa-'+k);if(!el)return;if(el.tagName==='SELECT')el.value=_waSettings[k]||'';else el.value=_waSettings[k]||''});waRenderTemplateManager();waApplyProviderUI()}catch(e){toast('WA settings load failed: '+e.message,'err')}loadWaConversations();_startWaPolling()}
 function isWhatsappChatNearBottom(threshold=96){const el=$('wa-messages');if(!el)return true;return (el.scrollHeight-el.scrollTop-el.clientHeight)<=threshold}
 function scrollWhatsappChatToBottom(){const el=$('wa-messages');if(!el)return;requestAnimationFrame(()=>{el.scrollTop=el.scrollHeight})}
@@ -3539,6 +3781,987 @@ window.sendInvoiceWhatsApp = async function(invoiceId) {
   } catch (err) {
     toast(err.message || 'WhatsApp sending failed', 'err');
   }
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// DENTAL LAB ORDERS TRACKING UI
+// ══════════════════════════════════════════════════════════════════════════
+
+window.loadDentalLabOrdersUI = async function() {
+  try {
+    const branch = $('lab-filter-branch')?.value || '';
+    const status = $('lab-filter-status')?.value || '';
+    const doctor = $('lab-filter-doctor')?.value || '';
+
+    // Fetch Stats
+    let statsUrl = '/api/dental-lab/stats';
+    if (branch) statsUrl += '?branch_name=' + encodeURIComponent(branch);
+    try {
+      const s = await api(statsUrl);
+      if (s.success && s.status_counts) {
+        if ($('lab-kpi-fabrication')) $('lab-kpi-fabrication').textContent = s.status_counts.in_fabrication || 0;
+        if ($('lab-kpi-arrived')) $('lab-kpi-arrived').textContent = s.status_counts.received_at_clinic || 0;
+        if ($('lab-kpi-cemented')) $('lab-kpi-cemented').textContent = (s.status_counts.cemented_done || 0) + (s.status_counts.trial_fitted || 0);
+        if ($('lab-kpi-margin')) $('lab-kpi-margin').textContent = '₹' + Number(s.gross_margin || 0).toLocaleString('en-IN');
+      }
+    } catch (e) {
+      console.warn('Failed to load lab stats', e);
+    }
+
+    // Fetch Orders
+    let queryParams = [];
+    if (branch) queryParams.push('branch_name=' + encodeURIComponent(branch));
+    if (status) queryParams.push('status=' + encodeURIComponent(status));
+    if (doctor) queryParams.push('doctor_name=' + encodeURIComponent(doctor));
+    const ordersUrl = '/api/dental-lab/orders' + (queryParams.length ? '?' + queryParams.join('&') : '');
+
+    const r = await api(ordersUrl);
+    const orders = (r && r.orders) || [];
+    if ($('lab-orders-count')) $('lab-orders-count').textContent = `${orders.length} order${orders.length === 1 ? '' : 's'}`;
+
+    const container = $('lab-orders-table');
+    if (!container) return;
+
+    if (!orders.length) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:40px 20px;border:1px dashed var(--border);border-radius:10px;color:var(--text2)">
+          <div style="font-size:2rem;margin-bottom:8px">🔬</div>
+          <div style="font-weight:600;font-size:1.1rem">No Dental Lab Orders Found</div>
+          <p style="margin:6px 0 16px;font-size:0.88rem">Create a new order for crowns, bridges, dentures or veneers sent to external dental labs.</p>
+          <button class="primary" onclick="openCreateLabOrderModal()">➕ Create Dental Lab Order</button>
+        </div>
+      `;
+      return;
+    }
+
+    const statusBadge = (st) => {
+      switch(st) {
+        case 'sent_to_lab':
+          return '<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">Sent to Lab</span>';
+        case 'in_fabrication':
+          return '<span class="badge" style="background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe">In Fabrication</span>';
+        case 'received_at_clinic':
+          return '<span class="badge" style="background:#d1fae5;color:#065f46;border:1px solid #a7f3d0">Received at Clinic</span>';
+        case 'trial_fitted':
+          return '<span class="badge" style="background:#f3e8ff;color:#6b21a8;border:1px solid #e9d5ff">Trial Fitted</span>';
+        case 'cemented_done':
+          return '<span class="badge" style="background:#ecfdf5;color:#047857;border:1px solid #6ee7b7">✅ Cemented Done</span>';
+        case 'remake_required':
+          return '<span class="badge" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca">⚠️ Remake Required</span>';
+        default:
+          return `<span class="badge">${esc(st || '')}</span>`;
+      }
+    };
+
+    let html = `
+      <table class="table" style="width:100%;font-size:0.86rem;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border);text-align:left">
+            <th style="padding:10px 8px">Order ID</th>
+            <th style="padding:10px 8px">Patient & Contact</th>
+            <th style="padding:10px 8px">Doctor & Branch</th>
+            <th style="padding:10px 8px">Lab & Item</th>
+            <th style="padding:10px 8px">Teeth / Shade</th>
+            <th style="padding:10px 8px">Expected Date</th>
+            <th style="padding:10px 8px">Status</th>
+            <th style="padding:10px 8px">Lab Cost / Patient</th>
+            <th style="padding:10px 8px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    orders.forEach(o => {
+      html += `
+        <tr style="border-bottom:1px solid var(--border);vertical-align:middle">
+          <td style="padding:10px 8px;font-family:monospace;font-weight:600">${esc(o.id)}</td>
+          <td style="padding:10px 8px">
+            <div style="font-weight:600">${esc(o.patient_name)}</div>
+            <div class="muted" style="font-size:0.78rem">${esc(o.patient_phone || '-')}</div>
+          </td>
+          <td style="padding:10px 8px">
+            <div>${esc(o.doctor_name)}</div>
+            <div class="muted" style="font-size:0.75rem">${esc(o.branch_name)}</div>
+          </td>
+          <td style="padding:10px 8px">
+            <div style="font-weight:600;color:var(--primary)">${esc(o.item_type)}</div>
+            <div class="muted" style="font-size:0.78rem">🏭 ${esc(o.lab_name)}</div>
+          </td>
+          <td style="padding:10px 8px">
+            <div>Teeth: <b>${esc(o.tooth_numbers || 'N/A')}</b></div>
+            <div class="muted" style="font-size:0.78rem">Shade: <b>${esc(o.shade || 'A2')}</b></div>
+          </td>
+          <td style="padding:10px 8px">
+            <div>${esc(o.expected_date)}</div>
+            <div class="muted" style="font-size:0.75rem">Sent: ${esc(o.sent_date)}</div>
+          </td>
+          <td style="padding:10px 8px">
+            ${statusBadge(o.status)}
+          </td>
+          <td style="padding:10px 8px">
+            <div>Cost: ₹${Number(o.lab_cost || 0).toLocaleString('en-IN')}</div>
+            <div style="font-size:0.78rem;color:#059669;font-weight:600">Charge: ₹${Number(o.patient_charge || 0).toLocaleString('en-IN')}</div>
+          </td>
+          <td style="padding:10px 8px;text-align:right">
+            <select onchange="updateLabOrderStatus('${esc(o.id)}', this.value)" style="font-size:0.78rem;padding:3px 6px">
+              <option value="" disabled selected>Update Status...</option>
+              <option value="sent_to_lab" ${o.status==='sent_to_lab'?'disabled':''}>Sent to Lab</option>
+              <option value="in_fabrication" ${o.status==='in_fabrication'?'disabled':''}>In Fabrication</option>
+              <option value="received_at_clinic" ${o.status==='received_at_clinic'?'disabled':''}>Received at Clinic</option>
+              <option value="trial_fitted" ${o.status==='trial_fitted'?'disabled':''}>Trial Fitted</option>
+              <option value="cemented_done" ${o.status==='cemented_done'?'disabled':''}>Cemented / Done</option>
+              <option value="remake_required" ${o.status==='remake_required'?'disabled':''}>Remake Required</option>
+            </select>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('loadDentalLabOrdersUI error:', err);
+    toast(err.message || 'Failed to load dental lab orders', 'err');
+  }
+};
+
+window.updateLabOrderStatus = async function(orderId, newStatus) {
+  if (!orderId || !newStatus) return;
+  try {
+    toast(`Updating order ${orderId}...`);
+    const payload = { status: newStatus };
+    if (newStatus === 'received_at_clinic') {
+      payload.received_date = new Date().toISOString().split('T')[0];
+    }
+    const r = await api(`/api/dental-lab/orders/${encodeURIComponent(orderId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (r.success) {
+      toast(`Order status updated to ${newStatus.replace(/_/g, ' ')}! ✅`);
+      loadDentalLabOrdersUI();
+    }
+  } catch (err) {
+    toast(err.message || 'Failed to update order status', 'err');
+  }
+};
+
+window.openCreateLabOrderModal = function() {
+  const today = new Date().toISOString().split('T')[0];
+  const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
+  const html = `
+    <h2>➕ New Dental Laboratory Order</h2>
+    <p class="muted" style="margin-top:-6px;font-size:0.85rem">Dispatch crown, bridge, denture or veneer fabrication to certified dental lab.</p>
+    <form id="create-lab-order-form" onsubmit="submitCreateLabOrder(event)" style="margin-top:14px">
+      <div class="grid cols-2" style="gap:12px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Patient Name *</label>
+          <input id="new-lab-patient" required placeholder="e.g. Ramesh Chandra">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Patient Phone *</label>
+          <input id="new-lab-phone" required placeholder="e.g. +919876543210">
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Attending Dental Surgeon *</label>
+          <select id="new-lab-doctor" required>
+            <option value="Dr. P. Sudhakar (BDS, MDS - Implantologist & Periodontist)">Dr. P. Sudhakar (BDS, MDS)</option>
+            <option value="Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Surgeon)">Dr. K. Mounika (BDS, PGDCC)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Clinic Branch *</label>
+          <select id="new-lab-branch" required>
+            <option value="ECIL / Kapra (Main Clinic)">ECIL / Kapra (Main Clinic)</option>
+            <option value="AS Rao Nagar Branch">AS Rao Nagar Branch</option>
+            <option value="Sainikpuri Branch">Sainikpuri Branch</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">External Dental Lab *</label>
+          <input id="new-lab-name" list="dental-labs-list" required placeholder="Select or type lab name">
+          <datalist id="dental-labs-list">
+            <option value="DentCare Dental Lab (Hyderabad)">
+            <option value="Apex CAD/CAM Digital Dental Studio">
+            <option value="Modern Prosthetic Dental Lab">
+            <option value="Illusion Dental Aligners & Crowns">
+          </datalist>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Prosthetic / Item Type *</label>
+          <select id="new-lab-item" required>
+            <option value="Zirconia Crown (Multi-layer Premium)">Zirconia Crown (Multi-layer Premium)</option>
+            <option value="Zirconia 3-Unit Bridge">Zirconia 3-Unit Bridge</option>
+            <option value="PFM Crown (Ceramic fused to metal)">PFM Crown (Ceramic fused to metal)</option>
+            <option value="E-max Lithium Disilicate Veneer">E-max Lithium Disilicate Veneer</option>
+            <option value="Implant Custom Abutment & Crown">Implant Custom Abutment & Crown</option>
+            <option value="Complete Upper & Lower Denture">Complete Upper & Lower Denture</option>
+            <option value="Cast Partial Denture (CPD)">Cast Partial Denture (CPD)</option>
+            <option value="Clear Aligners (Step 1-10)">Clear Aligners (Step 1-10)</option>
+            <option value="Night Guard / Bruxism Splint">Night Guard / Bruxism Splint</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Tooth Numbers (FDI / Universal)</label>
+          <input id="new-lab-teeth" placeholder="e.g. 14, 15, 16 or FDI #21">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Vita Shade Guide *</label>
+          <input id="new-lab-shade" value="A2" placeholder="e.g. A1, A2, A3, B1, BL2 Bleach">
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Sent Date *</label>
+          <input id="new-lab-sent" type="date" required value="${today}">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Expected Delivery Date *</label>
+          <input id="new-lab-expected" type="date" required value="${nextWeek}">
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Lab Fabrication Cost (₹)</label>
+          <input id="new-lab-cost" type="number" step="0.01" value="2500" placeholder="e.g. 2500">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Patient Treatment Charge (₹)</label>
+          <input id="new-lab-charge" type="number" step="0.01" value="8500" placeholder="e.g. 8500">
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label style="font-weight:600;font-size:0.85rem">Clinical Notes / Margin Specifications</label>
+        <textarea id="new-lab-notes" rows="2" placeholder="e.g. Chamfer finish line, subgingival prep, canine guidance bite registration included."></textarea>
+      </div>
+
+      <div class="modal-actions" style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="primary" style="font-weight:700">🚀 Send Order to Lab</button>
+      </div>
+    </form>
+  `;
+  showModal(html);
+};
+
+window.submitCreateLabOrder = async function(event) {
+  event.preventDefault();
+  try {
+    const payload = {
+      patient_name: $('new-lab-patient').value.trim(),
+      patient_phone: $('new-lab-phone').value.trim(),
+      doctor_name: $('new-lab-doctor').value.trim(),
+      branch_name: $('new-lab-branch').value.trim(),
+      lab_name: $('new-lab-name').value.trim(),
+      item_type: $('new-lab-item').value.trim(),
+      tooth_numbers: $('new-lab-teeth').value.trim(),
+      shade: $('new-lab-shade').value.trim(),
+      sent_date: $('new-lab-sent').value.trim(),
+      expected_date: $('new-lab-expected').value.trim(),
+      lab_cost: parseFloat($('new-lab-cost').value || '0'),
+      patient_charge: parseFloat($('new-lab-charge').value || '0'),
+      notes: $('new-lab-notes').value.trim(),
+    };
+
+    toast('Creating dental lab order...');
+    const r = await api('/api/dental-lab/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (r.success) {
+      toast(`Lab Order ${r.order_id} created successfully! 🔬`);
+      closeModal();
+      loadDentalLabOrdersUI();
+    }
+  } catch (err) {
+    toast(err.message || 'Failed to create lab order', 'err');
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// DENTAL MULTI-SITTING TREATMENT PLANS UI
+// ══════════════════════════════════════════════════════════════════════════
+
+window._dentalTreatmentPresets = [];
+
+window.loadTreatmentPlansUI = async function() {
+  try {
+    const branch = $('tp-filter-branch')?.value || '';
+    const status = $('tp-filter-status')?.value || '';
+    const doctor = $('tp-filter-doctor')?.value || '';
+    const phone = $('tp-filter-phone')?.value || '';
+
+    let queryParams = [];
+    if (branch) queryParams.push('branch_name=' + encodeURIComponent(branch));
+    if (status) queryParams.push('status=' + encodeURIComponent(status));
+    if (doctor) queryParams.push('doctor_name=' + encodeURIComponent(doctor));
+    if (phone) queryParams.push('patient_phone=' + encodeURIComponent(phone));
+
+    const url = '/api/treatment-plans' + (queryParams.length ? '?' + queryParams.join('&') : '');
+    const r = await api(url);
+    const plans = (r && r.plans) || [];
+    const stats = (r && r.stats) || {};
+
+    if ($('tp-kpi-total')) $('tp-kpi-total').textContent = stats.total_plans || plans.length;
+    if ($('tp-kpi-active')) $('tp-kpi-active').textContent = stats.in_progress || 0;
+    if ($('tp-kpi-completed')) $('tp-kpi-completed').textContent = stats.completed || 0;
+    if ($('tp-plans-count')) $('tp-plans-count').textContent = `${plans.length} plan${plans.length === 1 ? '' : 's'}`;
+
+    const container = $('tp-plans-table');
+    if (!container) return;
+
+    if (!plans.length) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:40px 20px;border:1px dashed var(--border);border-radius:10px;color:var(--text2)">
+          <div style="font-size:2rem;margin-bottom:8px">🦷</div>
+          <div style="font-weight:600;font-size:1.1rem">No Dental Treatment Plans Found</div>
+          <p style="margin:6px 0 16px;font-size:0.88rem">Create a multi-sitting plan for Root Canal, Implants, Smile Makeovers, or Orthodontics.</p>
+          <button class="primary" onclick="openCreateTreatmentPlanModal()">➕ Create Treatment Plan</button>
+        </div>
+      `;
+      return;
+    }
+
+    const planBadge = (st) => {
+      switch(st) {
+        case 'in_progress':
+          return '<span class="badge" style="background:#fef3c7;color:#92400e;border:1px solid #fde68a">⏳ In Progress</span>';
+        case 'completed':
+          return '<span class="badge" style="background:#d1fae5;color:#065f46;border:1px solid #a7f3d0">✅ Completed</span>';
+        case 'paused':
+          return '<span class="badge" style="background:#f3f4f6;color:#374151;border:1px solid #e5e7eb">⏸ Paused</span>';
+        default:
+          return `<span class="badge">${esc(st || '')}</span>`;
+      }
+    };
+
+    let html = `
+      <table class="table" style="width:100%;font-size:0.86rem;border-collapse:collapse">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border);text-align:left">
+            <th style="padding:10px 8px">Plan ID</th>
+            <th style="padding:10px 8px">Patient & Contact</th>
+            <th style="padding:10px 8px">Doctor & Branch</th>
+            <th style="padding:10px 8px">Treatment & Teeth</th>
+            <th style="padding:10px 8px">Sittings Progress</th>
+            <th style="padding:10px 8px">Next Sitting</th>
+            <th style="padding:10px 8px">Cost / Balance</th>
+            <th style="padding:10px 8px">Status</th>
+            <th style="padding:10px 8px;text-align:right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    plans.forEach(p => {
+      const totalSit = p.total_sittings || 1;
+      const compSit = p.completed_sittings || 0;
+      const pct = Math.min(100, Math.round((compSit / totalSit) * 100));
+      const balance = (p.estimated_cost || 0) - (p.paid_amount || 0);
+
+      html += `
+        <tr style="border-bottom:1px solid var(--border);vertical-align:middle">
+          <td style="padding:10px 8px;font-family:monospace;font-weight:600">${esc(p.id)}</td>
+          <td style="padding:10px 8px">
+            <div style="font-weight:600">${esc(p.patient_name)}</div>
+            <div class="muted" style="font-size:0.78rem">${esc(p.patient_phone)}</div>
+          </td>
+          <td style="padding:10px 8px">
+            <div>${esc(p.doctor_name)}</div>
+            <div class="muted" style="font-size:0.75rem">${esc(p.branch_name)}</div>
+          </td>
+          <td style="padding:10px 8px">
+            <div style="font-weight:600;color:var(--primary)">${esc(p.treatment_name)}</div>
+            <div class="muted" style="font-size:0.78rem">Teeth: <b>${esc(p.teeth_involved || 'All')}</b></div>
+          </td>
+          <td style="padding:10px 8px;min-width:130px">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;font-weight:600;margin-bottom:3px">
+              <span>Sitting ${compSit} of ${totalSit}</span>
+              <span>${pct}%</span>
+            </div>
+            <div style="width:100%;height:7px;background:var(--border);border-radius:4px;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:${pct===100?'#10b981':'#3b82f6'};transition:width 0.3s"></div>
+            </div>
+          </td>
+          <td style="padding:10px 8px">
+            <div>${esc(p.next_sitting_date || 'None scheduled')}</div>
+            <div class="muted" style="font-size:0.75rem">Started: ${esc(p.start_date)}</div>
+          </td>
+          <td style="padding:10px 8px">
+            <div>Total: ₹${Number(p.estimated_cost || 0).toLocaleString('en-IN')}</div>
+            <div style="font-size:0.78rem;color:${balance > 0 ? '#ef4444' : '#10b981'};font-weight:600">
+              ${balance > 0 ? `Due: ₹${Number(balance).toLocaleString('en-IN')}` : '✅ Fully Paid'}
+            </div>
+          </td>
+          <td style="padding:10px 8px">
+            ${planBadge(p.status)}
+          </td>
+          <td style="padding:10px 8px;text-align:right">
+            <button class="primary" style="font-size:0.78rem;padding:4px 8px" onclick="viewTreatmentPlanDetails('${esc(p.id)}')">
+              🔍 Sittings Timeline
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('loadTreatmentPlansUI error:', err);
+    toast(err.message || 'Failed to load treatment plans', 'err');
+  }
+};
+
+window.viewTreatmentPlanDetails = async function(planId) {
+  try {
+    toast(`Loading treatment plan ${planId}...`);
+    const r = await api(`/api/treatment-plans/${encodeURIComponent(planId)}`);
+    const p = (r && r.plan) || null;
+    if (!p) throw new Error('Plan details not found');
+
+    const sittings = p.sittings || [];
+    const balance = (p.estimated_cost || 0) - (p.paid_amount || 0);
+
+    let sittingsHtml = '';
+    if (!sittings.length) {
+      sittingsHtml = '<p class="muted">No sittings recorded for this plan.</p>';
+    } else {
+      sittings.forEach(s => {
+        const isDone = s.status === 'completed';
+        sittingsHtml += `
+          <div class="card" style="margin-top:12px;padding:14px;border-left:4px solid ${isDone ? '#10b981' : '#f59e0b'};background:color-mix(in srgb,var(--card) 95%,var(--input) 5%)">
+            <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+              <div>
+                <span class="badge" style="background:${isDone ? '#d1fae5' : '#fef3c7'};color:${isDone ? '#065f46' : '#92400e'}">
+                  ${isDone ? '✅ Completed' : '⏳ Scheduled'}
+                </span>
+                <b style="margin-left:8px;font-size:0.95rem">${esc(s.sitting_title)}</b>
+              </div>
+              <div style="font-size:0.82rem" class="muted">
+                ${isDone ? `Completed on: <b>${esc(s.completed_date || '-')}</b>` : `Scheduled for: <b>${esc(s.scheduled_date || 'Pending')}</b>`}
+              </div>
+            </div>
+
+            <div style="margin-top:10px;font-size:0.86rem">
+              <b>Clinical Findings / Procedure Done:</b>
+              <p style="margin:4px 0 0;white-space:pre-wrap;color:var(--text)">${esc(s.doctor_notes || 'No doctor clinical notes recorded yet.')}</p>
+            </div>
+
+            ${s.prescriptions ? `
+              <div style="margin-top:8px;font-size:0.84rem;background:rgba(59,130,246,0.06);padding:8px;border-radius:6px;border:1px solid rgba(59,130,246,0.2)">
+                <b>💊 Medications / Post-Op Instructions:</b>
+                <div style="margin-top:2px;color:var(--text)">${esc(s.prescriptions)}</div>
+              </div>
+            ` : ''}
+
+            ${!isDone ? `
+              <div style="margin-top:12px;display:flex;justify-content:flex-end">
+                <button class="primary" style="font-size:0.82rem;font-weight:600" onclick="completeTreatmentSittingPrompt('${esc(p.id)}', '${esc(s.id)}', ${s.sitting_number})">
+                  ✅ Complete Sitting #${s.sitting_number}
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      });
+    }
+
+    const html = `
+      <div style="max-width:760px">
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <h2>🦷 Treatment Plan: ${esc(p.treatment_name)}</h2>
+          <span class="badge" style="font-size:0.85rem">${esc(p.id)}</span>
+        </div>
+        <p class="muted" style="margin-top:-6px;font-size:0.88rem">${esc(p.branch_name)} • Attending Doctor: <b>${esc(p.doctor_name)}</b></p>
+
+        <!-- Summary Strip -->
+        <div class="grid cols-3" style="gap:10px;margin-top:14px;background:color-mix(in srgb,var(--card) 90%,var(--primary) 10%);padding:12px;border-radius:8px">
+          <div>
+            <div class="muted" style="font-size:0.75rem">Patient</div>
+            <b>${esc(p.patient_name)}</b>
+            <div class="muted" style="font-size:0.75rem">${esc(p.patient_phone)}</div>
+          </div>
+          <div>
+            <div class="muted" style="font-size:0.75rem">Teeth Involved</div>
+            <b>${esc(p.teeth_involved || 'All')}</b>
+            <div class="muted" style="font-size:0.75rem">Started: ${esc(p.start_date)}</div>
+          </div>
+          <div>
+            <div class="muted" style="font-size:0.75rem">Financial Summary</div>
+            <b>Total: ₹${Number(p.estimated_cost || 0).toLocaleString('en-IN')}</b>
+            <div style="font-size:0.75rem;color:${balance > 0 ? '#ef4444' : '#10b981'};font-weight:600">
+              ${balance > 0 ? `Due: ₹${Number(balance).toLocaleString('en-IN')}` : '✅ Fully Paid'}
+            </div>
+          </div>
+        </div>
+
+        ${p.clinical_notes ? `
+          <div style="margin-top:12px;font-size:0.86rem;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:8px">
+            <b>Case Diagnosis & Clinical Notes:</b>
+            <p style="margin:4px 0 0;color:var(--text)">${esc(p.clinical_notes)}</p>
+          </div>
+        ` : ''}
+
+        <h3 style="margin-top:20px;display:flex;align-items:center;gap:8px">
+          📋 Sittings Progression (${p.completed_sittings || 0}/${p.total_sittings || 1} Completed)
+        </h3>
+
+        ${sittingsHtml}
+
+        <div class="modal-actions" style="margin-top:20px;display:flex;justify-content:flex-end">
+          <button onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    `;
+    showModal(html);
+  } catch (err) {
+    toast(err.message || 'Could not load plan details', 'err');
+  }
+};
+
+window.completeTreatmentSittingPrompt = function(planId, sittingId, sittingNum) {
+  const today = new Date().toISOString().split('T')[0];
+  const nextSittingDefault = new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0];
+
+  const html = `
+    <h2>✅ Complete Sitting #${sittingNum}</h2>
+    <p class="muted" style="margin-top:-6px;font-size:0.85rem">Record clinical procedures completed, doctor observations, and patient prescription.</p>
+    <form id="complete-sitting-form" onsubmit="submitCompleteSitting(event, '${esc(planId)}', '${esc(sittingId)}')" style="margin-top:14px">
+      <div>
+        <label style="font-weight:600;font-size:0.85rem">Completion Date *</label>
+        <input id="comp-sit-date" type="date" required value="${today}">
+      </div>
+
+      <div style="margin-top:10px">
+        <label style="font-weight:600;font-size:0.85rem">Clinical Notes & Observations *</label>
+        <textarea id="comp-sit-notes" required rows="3" placeholder="e.g. Canals dried and obturated with gutta-percha. Temporary dressing placed. No active pain."></textarea>
+      </div>
+
+      <div style="margin-top:10px">
+        <label style="font-weight:600;font-size:0.85rem">Prescriptions & Post-Op Advice</label>
+        <textarea id="comp-sit-rx" rows="2" placeholder="e.g. Amoxicillin 500mg TDS x 5 days, Zerodol-P BD x 3 days, warm saline rinses."></textarea>
+      </div>
+
+      <div style="margin-top:10px">
+        <label style="font-weight:600;font-size:0.85rem">Next Sitting Scheduled Date (Optional)</label>
+        <input id="comp-sit-next-date" type="date" value="${nextSittingDefault}">
+      </div>
+
+      <div class="modal-actions" style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="viewTreatmentPlanDetails('${esc(planId)}')">Back</button>
+        <button type="submit" class="primary" style="font-weight:700">💾 Save &amp; Advance Sitting</button>
+      </div>
+    </form>
+  `;
+  showModal(html);
+};
+
+window.submitCompleteSitting = async function(event, planId, sittingId) {
+  event.preventDefault();
+  try {
+    const payload = {
+      completed_date: $('comp-sit-date').value.trim(),
+      doctor_notes: $('comp-sit-notes').value.trim(),
+      prescriptions: $('comp-sit-rx').value.trim(),
+      next_sitting_date: $('comp-sit-next-date').value.trim() || null,
+    };
+
+    toast('Advancing treatment sitting...');
+    const r = await api(`/api/treatment-plans/${encodeURIComponent(planId)}/sittings/${encodeURIComponent(sittingId)}/complete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (r.success) {
+      toast(`Sitting completed successfully! (${r.completed_sittings}/${r.total_sittings}) ✅`);
+      loadTreatmentPlansUI();
+      viewTreatmentPlanDetails(planId);
+    }
+  } catch (err) {
+    toast(err.message || 'Failed to complete sitting', 'err');
+  }
+};
+
+window.openCreateTreatmentPlanModal = async function() {
+  const today = new Date().toISOString().split('T')[0];
+  const nextSittingDefault = new Date(Date.now() + 5 * 86400000).toISOString().split('T')[0];
+
+  try {
+    const r = await api('/api/treatment-plans/presets');
+    window._dentalTreatmentPresets = (r && r.presets) || [];
+  } catch (e) {
+    console.warn('Could not fetch presets', e);
+  }
+
+  const presetsOptions = window._dentalTreatmentPresets.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+
+  const html = `
+    <h2>➕ New Clinical Dental Treatment Plan</h2>
+    <p class="muted" style="margin-top:-6px;font-size:0.85rem">Setup a multi-sitting treatment sequence for root canal, dental implant, or smile design.</p>
+    
+    <div style="margin-top:12px;padding:10px;background:color-mix(in srgb,var(--card) 92%,var(--input) 8%);border-radius:8px">
+      <label style="font-weight:600;font-size:0.85rem">Quick Preset (Auto-fills Procedure & Sittings):</label>
+      <select id="new-tp-preset" onchange="applyTreatmentPreset(this.value)" style="margin-top:4px">
+        <option value="">-- Custom Procedure (Manual Sittings) --</option>
+        ${presetsOptions}
+      </select>
+    </div>
+
+    <form id="create-tp-form" onsubmit="submitCreateTreatmentPlan(event)" style="margin-top:14px">
+      <div class="grid cols-2" style="gap:12px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Patient Name *</label>
+          <input id="new-tp-patient" required placeholder="e.g. Ramesh Chandra">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Patient Phone *</label>
+          <input id="new-tp-phone" required placeholder="e.g. +919876543210">
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Attending Dental Surgeon *</label>
+          <select id="new-tp-doctor" required>
+            <option value="Dr. P. Sudhakar (BDS, MDS - Implantologist & Periodontist)">Dr. P. Sudhakar (BDS, MDS)</option>
+            <option value="Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Surgeon)">Dr. K. Mounika (BDS, PGDCC)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Clinic Branch *</label>
+          <select id="new-tp-branch" required>
+            <option value="ECIL / Kapra (Main Clinic)">ECIL / Kapra (Main Clinic)</option>
+            <option value="AS Rao Nagar Branch">AS Rao Nagar Branch</option>
+            <option value="Sainikpuri Branch">Sainikpuri Branch</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Treatment / Procedure Name *</label>
+          <input id="new-tp-name" required placeholder="e.g. Molar Root Canal Treatment">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Teeth Involved (FDI / Universal)</label>
+          <input id="new-tp-teeth" placeholder="e.g. 16, 26 or Upper Quadrant">
+        </div>
+      </div>
+
+      <div class="grid cols-3" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Total Planned Sittings *</label>
+          <input id="new-tp-sittings" type="number" min="1" max="30" value="3" required>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Estimated Cost (₹) *</label>
+          <input id="new-tp-cost" type="number" step="0.01" value="5000" required>
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Initial Advance Paid (₹)</label>
+          <input id="new-tp-paid" type="number" step="0.01" value="2000">
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:12px;margin-top:10px">
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Start Date *</label>
+          <input id="new-tp-start" type="date" required value="${today}">
+        </div>
+        <div>
+          <label style="font-weight:600;font-size:0.85rem">Next Sitting Scheduled Date</label>
+          <input id="new-tp-next" type="date" value="${nextSittingDefault}">
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label style="font-weight:600;font-size:0.85rem">Clinical Case Notes & Diagnosis</label>
+        <textarea id="new-tp-notes" rows="2" placeholder="e.g. Symptomatic irreversible pulpitis on 16. Cold test positive with lingering pain."></textarea>
+      </div>
+
+      <div class="modal-actions" style="margin-top:18px;display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="primary" style="font-weight:700">🚀 Create Treatment Plan</button>
+      </div>
+    </form>
+  `;
+  showModal(html);
+};
+
+window.applyTreatmentPreset = function(presetId) {
+  if (!presetId) return;
+  const p = window._dentalTreatmentPresets.find(x => x.id === presetId);
+  if (!p) return;
+
+  if ($('new-tp-name')) $('new-tp-name').value = p.name;
+  if ($('new-tp-sittings')) $('new-tp-sittings').value = p.total_sittings;
+  if ($('new-tp-cost')) $('new-tp-cost').value = p.estimated_cost;
+  if ($('new-tp-paid')) $('new-tp-paid').value = Math.round(p.estimated_cost / 2);
+};
+
+window.submitCreateTreatmentPlan = async function(event) {
+  event.preventDefault();
+  try {
+    const presetId = $('new-tp-preset')?.value || '';
+    const preset = window._dentalTreatmentPresets.find(x => x.id === presetId);
+
+    const payload = {
+      patient_name: $('new-tp-patient').value.trim(),
+      patient_phone: $('new-tp-phone').value.trim(),
+      doctor_name: $('new-tp-doctor').value.trim(),
+      branch_name: $('new-tp-branch').value.trim(),
+      treatment_name: $('new-tp-name').value.trim(),
+      teeth_involved: $('new-tp-teeth').value.trim(),
+      total_sittings: parseInt($('new-tp-sittings').value || '1', 10),
+      estimated_cost: parseFloat($('new-tp-cost').value || '0'),
+      paid_amount: parseFloat($('new-tp-paid').value || '0'),
+      start_date: $('new-tp-start').value.trim(),
+      next_sitting_date: $('new-tp-next').value.trim() || null,
+      clinical_notes: $('new-tp-notes').value.trim(),
+    };
+
+    if (preset && preset.sittings) {
+      payload.sittings = preset.sittings.map(s => ({
+        sitting_number: s.sitting_number,
+        sitting_title: s.sitting_title,
+        scheduled_date: s.sitting_number === 1 ? payload.start_date : payload.next_sitting_date,
+        doctor_notes: s.notes,
+        prescriptions: null
+      }));
+    }
+
+    toast('Creating treatment plan...');
+    const r = await api('/api/treatment-plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (r.success) {
+      toast(`Treatment plan ${r.plan_id} created successfully! 🦷`);
+      closeModal();
+      loadTreatmentPlansUI();
+    }
+  } catch (err) {
+    toast(err.message || 'Failed to create treatment plan', 'err');
+  }
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// DENTAL POST-OP CARE & 6-MONTH RECALLS UI
+// ══════════════════════════════════════════════════════════════════════════
+
+window._dentalProtocols = null;
+window._dueRecallPatients = [];
+
+window.loadDentalCareUI = async function() {
+  try {
+    if (!window._dentalProtocols) {
+      const r = await api('/api/dental-care/protocols');
+      window._dentalProtocols = (r && r.protocols) || {};
+    }
+    updatePostOpPreview();
+    loadDentalRecallsUI();
+  } catch (e) {
+    console.error('loadDentalCareUI error', e);
+  }
+};
+
+window.updatePostOpPreview = function() {
+  const patient = $('postop-patient-name')?.value.trim() || 'Patient Name';
+  const protoKey = $('postop-protocol-type')?.value || 'extraction';
+  const doctor = $('postop-doctor-name')?.value || 'Dr. P. Sudhakar (BDS, MDS)';
+  const branch = $('postop-branch-name')?.value || 'ECIL / Kapra (Main Clinic)';
+
+  const proto = window._dentalProtocols ? window._dentalProtocols[protoKey] : null;
+  const title = proto ? proto.title : 'Dental Procedure Aftercare';
+  const instructions = proto ? proto.instructions : [
+    'Take all prescribed medications on time.',
+    'Maintain proper oral hygiene without disturbing the treated site.',
+    'Contact Smile Dental Clinic for any emergency.'
+  ];
+
+  let lines = [
+    `🦷 *Smile Dental Clinic & Implant Centre*`,
+    `📋 *${title}*`,
+    `Hello *${patient}*, here are your important post-procedure instructions from *${doctor}* (${branch}):\n`
+  ];
+
+  instructions.forEach((ins, idx) => {
+    lines.append ? lines.push(`*${idx + 1}.* ${ins}`) : lines.push(`*${idx + 1}.* ${ins}`);
+  });
+
+  lines.push('\n📞 *Emergency Clinic Helpline:* +91 90000 12345 / 040-27123456');
+  lines.push('Wishing you a smooth and swift recovery! ✨');
+
+  const preview = $('postop-message-preview');
+  if (preview) preview.textContent = lines.join('\n');
+};
+
+window.submitSendPostOp = async function(event) {
+  event.preventDefault();
+  try {
+    const payload = {
+      patient_name: $('postop-patient-name').value.trim(),
+      patient_phone: $('postop-patient-phone').value.trim(),
+      protocol_type: $('postop-protocol-type').value,
+      doctor_name: $('postop-doctor-name').value,
+      branch_name: $('postop-branch-name').value,
+    };
+
+    toast('Sending post-op care instructions via WhatsApp...');
+    const r = await api('/api/dental-care/send-post-op', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (r.success) {
+      toast(`Post-op care instructions delivered to ${r.patient_name}! 🦷✅`);
+      $('postop-patient-phone').value = '';
+    }
+  } catch (err) {
+    toast(err.message || 'Failed to send post-op care', 'err');
+  }
+};
+
+window.loadDentalRecallsUI = async function() {
+  try {
+    const branch = $('recall-filter-branch')?.value || '';
+    const days = $('recall-filter-days')?.value || '150';
+
+    let query = `?days_threshold=${encodeURIComponent(days)}`;
+    if (branch) query += `&branch_name=${encodeURIComponent(branch)}`;
+
+    const r = await api('/api/dental-care/recalls/due' + query);
+    const patients = (r && r.due_patients) || [];
+    window._dueRecallPatients = patients;
+
+    if ($('recall-count-label')) {
+      $('recall-count-label').textContent = `${patients.length} patient${patients.length === 1 ? '' : 's'} due for 6-month recall`;
+    }
+
+    if ($('recall-batch-btn')) {
+      $('recall-batch-btn').style.display = patients.length > 0 ? '' : 'none';
+    }
+
+    const container = $('recall-patients-list');
+    if (!container) return;
+
+    if (!patients.length) {
+      container.innerHTML = `
+        <div style="text-align:center;padding:30px 10px;border:1px dashed var(--border);border-radius:8px;color:var(--text2)">
+          <div style="font-size:1.8rem;margin-bottom:6px">🎉</div>
+          <b>All Patients Up to Date</b>
+          <p style="margin:4px 0 0;font-size:0.82rem">No completed patients found exceeding ${days} days without a recall.</p>
+        </div>
+      `;
+      return;
+    }
+
+    let html = `
+      <div style="display:flex;flex-direction:column;gap:8px">
+    `;
+
+    patients.forEach(p => {
+      html += `
+        <div class="card" style="padding:10px 12px;background:color-mix(in srgb,var(--card) 95%,var(--input) 5%);border-left:3px solid #3b82f6">
+          <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+            <div>
+              <b style="font-size:0.9rem">${esc(p.name)}</b>
+              <span class="muted" style="margin-left:6px;font-size:0.8rem">${esc(p.phone)}</span>
+              <div style="font-size:0.75rem;color:var(--primary);margin-top:2px">
+                Last Service: <b>${esc(p.last_service || 'Dental Consultation')}</b> • ${esc(p.branch_name || 'Smile Dental')}
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div class="badge" style="background:#fee2e2;color:#991b1b;font-size:0.75rem">
+                ${p.months_since} mos ago (${p.last_appointment_date})
+              </div>
+              <div style="margin-top:4px">
+                <button class="primary" style="font-size:0.75rem;padding:3px 8px" onclick="sendDentalRecallSingle('${esc(p.phone)}', '${esc(p.name)}', '${esc(p.last_appointment_date)}', '${esc(p.branch_name || 'ECIL / Kapra')}')">
+                  📢 Send Recall
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `</div>`;
+    container.innerHTML = html;
+  } catch (err) {
+    console.error('loadDentalRecallsUI error', err);
+    toast(err.message || 'Failed to load dental recalls', 'err');
+  }
+};
+
+window.sendDentalRecallSingle = async function(phone, name, lastVisitDate, branchName) {
+  try {
+    toast(`Sending 6-month recall to ${name}...`);
+    const r = await api('/api/dental-care/send-recall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patient_phone: phone,
+        patient_name: name,
+        last_visit_date: lastVisitDate,
+        branch_name: branchName
+      })
+    });
+    if (r.success) {
+      toast(`Recall delivered to ${name}! ✨✅`);
+    }
+  } catch (err) {
+    toast(err.message || 'Recall send failed', 'err');
+  }
+};
+
+window.dispatchAllDueRecalls = async function() {
+  const patients = window._dueRecallPatients || [];
+  if (!patients.length) return;
+  if (!confirm(`Are you sure you want to send 6-month WhatsApp checkup recalls to all ${patients.length} due patients?`)) return;
+
+  toast(`Starting batch recall for ${patients.length} patients...`);
+  let sent = 0;
+  for (const p of patients) {
+    try {
+      await api('/api/dental-care/send-recall', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_phone: p.phone,
+          patient_name: p.name,
+          last_visit_date: p.last_appointment_date,
+          branch_name: p.branch_name || 'ECIL / Kapra'
+        })
+      });
+      sent++;
+    } catch (e) {
+      console.warn(`Failed recall for ${p.phone}:`, e);
+    }
+  }
+  toast(`Batch recall completed: ${sent} of ${patients.length} sent! ✨🎉`);
+  loadDentalRecallsUI();
 };
 
 async function loadKanban(){try{const r=await api('/api/crm/kanban');$('kanban-board').innerHTML=(r.columns||[]).map(col=>`<div class="card kanban-column" data-stage="${esc(col.id)}" ondragover="kanbanDragOver(event)" ondragleave="kanbanDragLeave(event)" ondrop="kanbanDrop(event,'${esc(col.id)}')"><h3>${esc(col.label)} <span class="badge">${(col.leads||[]).length}</span></h3>${(col.leads||[]).slice(0,40).map(l=>`<div class="card kanban-lead" draggable="true" ondragstart="kanbanDragStart(event,'${encodeURIComponent(l.phone_number||'')}')" style="padding:10px;margin-top:8px"><b>${esc(l.lead_name||l.phone_number)}</b><br><span class="muted">${esc(l.phone_number||'')}</span><div class="row-actions" style="margin-top:8px">${['contacted','interested','callback_requested','demo_booked','demo_done','converted','not_interested','lost'].filter(st=>st!==col.id).map(st=>`<button onclick="moveLeadStage('${encodeURIComponent(l.phone_number||'')}','${st}')">${st.replaceAll('_',' ')}</button>`).join('')}</div></div>`).join('')}</div>`).join('')}catch(e){toast(e.message||'Could not load pipeline','err')}}
