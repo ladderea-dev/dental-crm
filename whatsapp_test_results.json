@@ -1,0 +1,457 @@
+{
+  "mode": "dry-run",
+  "total": 64,
+  "passed": 64,
+  "failed": 0,
+  "real_messages_sent": 0,
+  "results": [
+    {
+      "area": "template",
+      "name": "welcome_template",
+      "status": "passed",
+      "detail": "parameters=2/2; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "missed_call_template",
+      "status": "passed",
+      "detail": "parameters=2/2; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "callback_confirmation_template",
+      "status": "passed",
+      "detail": "parameters=4/4; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "appointment_confirmation_template",
+      "status": "passed",
+      "detail": "parameters=4/4; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "staff_appointment_notification_template",
+      "status": "passed",
+      "detail": "parameters=4/4; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "staff_appointment_reminder_template",
+      "status": "passed",
+      "detail": "parameters=3/3; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "staff_handoff_notification_template",
+      "status": "passed",
+      "detail": "parameters=2/2; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "reminder_template",
+      "status": "passed",
+      "detail": "parameters=3/3; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "no_response_followup_template",
+      "status": "passed",
+      "detail": "parameters=2/2; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "re_enquiry_followup_template",
+      "status": "passed",
+      "detail": "parameters=2/2; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "staff_demo_status_request",
+      "status": "passed",
+      "detail": "parameters=3/3; language=en",
+      "classification": ""
+    },
+    {
+      "area": "template",
+      "name": "service_completion_template",
+      "status": "passed",
+      "detail": "parameters=3/3; language=en",
+      "classification": ""
+    },
+    {
+      "area": "payload",
+      "name": "value_str_0",
+      "status": "passed",
+      "detail": "JSON-safe substitution",
+      "classification": ""
+    },
+    {
+      "area": "payload",
+      "name": "value_NoneType_4",
+      "status": "passed",
+      "detail": "JSON-safe substitution",
+      "classification": ""
+    },
+    {
+      "area": "payload",
+      "name": "value_str_15",
+      "status": "passed",
+      "detail": "JSON-safe substitution",
+      "classification": ""
+    },
+    {
+      "area": "payload",
+      "name": "value_str_4",
+      "status": "passed",
+      "detail": "JSON-safe substitution",
+      "classification": ""
+    },
+    {
+      "area": "payload",
+      "name": "value_str_1024",
+      "status": "passed",
+      "detail": "JSON-safe substitution",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "new_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "manual_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "uploaded_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "facebook_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "instagram_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "website_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "google_sheet_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "api_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "followup_lead",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "callback_scheduled",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "appointment_confirmed",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "showroom_visit_confirmed",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "re_enquiry",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "missed_call_retry",
+      "status": "passed",
+      "detail": "default=manual_only; enabled=False",
+      "classification": ""
+    },
+    {
+      "area": "workflow",
+      "name": "fallback_outcomes",
+      "status": "passed",
+      "detail": "fallback outcomes configured",
+      "classification": ""
+    },
+    {
+      "area": "webhook",
+      "name": "text",
+      "status": "passed",
+      "detail": "parsed=1",
+      "classification": ""
+    },
+    {
+      "area": "webhook",
+      "name": "image",
+      "status": "passed",
+      "detail": "parsed=1",
+      "classification": ""
+    },
+    {
+      "area": "webhook",
+      "name": "button",
+      "status": "passed",
+      "detail": "parsed=1",
+      "classification": ""
+    },
+    {
+      "area": "webhook",
+      "name": "list",
+      "status": "passed",
+      "detail": "parsed=1",
+      "classification": ""
+    },
+    {
+      "area": "webhook",
+      "name": "unsupported",
+      "status": "passed",
+      "detail": "parsed=1",
+      "classification": ""
+    },
+    {
+      "area": "webhook",
+      "name": "delivery_status",
+      "status": "passed",
+      "detail": "delivery receipt parsed",
+      "classification": ""
+    },
+    {
+      "area": "webhook",
+      "name": "malformed_shape",
+      "status": "passed",
+      "detail": "safe empty result",
+      "classification": ""
+    },
+    {
+      "area": "opt_out",
+      "name": "stop",
+      "status": "passed",
+      "detail": "opt-out recognized",
+      "classification": ""
+    },
+    {
+      "area": "opt_out",
+      "name": "unsubscribe",
+      "status": "passed",
+      "detail": "opt-out recognized",
+      "classification": ""
+    },
+    {
+      "area": "opt_out",
+      "name": "please_stop",
+      "status": "passed",
+      "detail": "opt-out recognized",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "http_400",
+      "status": "passed",
+      "detail": "failure classified without secret material",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "http_401",
+      "status": "passed",
+      "detail": "failure classified without secret material",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "http_403",
+      "status": "passed",
+      "detail": "failure classified without secret material",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "http_429",
+      "status": "passed",
+      "detail": "failure classified without secret material",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "http_500",
+      "status": "passed",
+      "detail": "failure classified without secret material",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "http_503",
+      "status": "passed",
+      "detail": "failure classified without secret material",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "invalid_access_token",
+      "status": "passed",
+      "detail": "provider error remains actionable",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "expired_token",
+      "status": "passed",
+      "detail": "provider error remains actionable",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "invalid_template_name",
+      "status": "passed",
+      "detail": "provider error remains actionable",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "language_mismatch",
+      "status": "passed",
+      "detail": "provider error remains actionable",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "recipient_not_on_WhatsApp",
+      "status": "passed",
+      "detail": "provider error remains actionable",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "invalid_phone_number",
+      "status": "passed",
+      "detail": "provider error remains actionable",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "network_timeout",
+      "status": "passed",
+      "detail": "provider error remains actionable",
+      "classification": ""
+    },
+    {
+      "area": "error",
+      "name": "ecosystem_restriction",
+      "status": "passed",
+      "detail": "Meta policy error sanitized",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "normalize_0000",
+      "status": "passed",
+      "detail": "E.164 normalization",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "normalize_0000",
+      "status": "passed",
+      "detail": "E.164 normalization",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "normalize_0000",
+      "status": "passed",
+      "detail": "E.164 normalization",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "normalize_0000",
+      "status": "passed",
+      "detail": "E.164 normalization",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "normalize_0000",
+      "status": "passed",
+      "detail": "E.164 normalization",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "reject_invalid",
+      "status": "passed",
+      "detail": "invalid recipient refused",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "reject_invalid",
+      "status": "passed",
+      "detail": "invalid recipient refused",
+      "classification": ""
+    },
+    {
+      "area": "phone",
+      "name": "reject_invalid",
+      "status": "passed",
+      "detail": "invalid recipient refused",
+      "classification": ""
+    }
+  ]
+}

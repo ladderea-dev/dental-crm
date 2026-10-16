@@ -1,0 +1,2941 @@
+import asyncio
+import json as _json_mod
+import logging
+import os
+import re
+import uuid
+from datetime import datetime, timedelta, time as dt_time
+from typing import Optional
+from collections import defaultdict
+from zoneinfo import ZoneInfo
+
+logger = logging.getLogger("db")
+
+DEFAULT_COUNTRY = "India"
+DEFAULT_COUNTRY_CODE = "+91"
+DEFAULT_TIMEZONE = "Asia/Kolkata"
+DEFAULT_CURRENCY = "INR"
+DEFAULT_PHONE_FORMAT = "+91XXXXXXXXXX"
+DEFAULT_CRM_STATUS = "New Patient Enquiry"
+DEFAULT_CRM_SOURCE = "Website"
+
+
+def _safe_data(result, default=None):
+    """Return result.data if the Supabase call returned a usable response.
+
+    Supabase's .maybe_single() can return None when no row matches, and any
+    network/auth failure can also yield None — both of which previously caused
+    ``AttributeError: 'NoneType' object has no attribute 'data'``. This helper
+    normalizes all of those into a safe value.
+    """
+    if result is None:
+        return default
+    data = getattr(result, "data", None)
+    return default if data is None else data
+
+
+def _safe_list(result):
+    data = _safe_data(result, default=[])
+    return data if isinstance(data, list) else []
+
+
+def _safe_row(result):
+    data = _safe_data(result, default=None)
+    if isinstance(data, dict):
+        return data
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        return data[0]
+    return None
+
+# ─── Env var alias normalization ─────────────────────────────────
+# Users commonly set intuitive names like GEMINI_API_KEY / SUPABASE_KEY.
+# Our code (and the Google/Supabase SDKs) expect canonical names.
+# If the canonical name is empty but an alias is set, promote the alias.
+_ALIASES = {
+    "GOOGLE_API_KEY":       ["GEMINI_API_KEY", "GOOGLE_GEMINI_API_KEY"],
+    "SUPABASE_SERVICE_KEY": ["SUPABASE_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
+    "SUPABASE_URL":         ["NEXT_PUBLIC_SUPABASE_URL"],
+}
+for canonical, aliases in _ALIASES.items():
+    if not os.environ.get(canonical):
+        for alt in aliases:
+            val = os.environ.get(alt)
+            if val:
+                os.environ[canonical] = val
+                break
+
+
+DEFAULTS = {
+    "LIVEKIT_URL":             os.getenv("LIVEKIT_URL", ""),
+    "LIVEKIT_API_KEY":         os.getenv("LIVEKIT_API_KEY", ""),
+    "LIVEKIT_API_SECRET":      os.getenv("LIVEKIT_API_SECRET", ""),
+    "GOOGLE_API_KEY":          os.getenv("GOOGLE_API_KEY", ""),
+    "GEMINI_MODEL":            os.getenv("GEMINI_MODEL", "gemini-3.1-flash-live-preview"),
+    "GEMINI_TTS_VOICE":        os.getenv("GEMINI_TTS_VOICE", "Kore"),
+    "USE_GEMINI_REALTIME":     os.getenv("USE_GEMINI_REALTIME", "true"),
+    "VOBIZ_SIP_DOMAIN":        os.getenv("VOBIZ_SIP_DOMAIN", ""),
+    "VOBIZ_USERNAME":          os.getenv("VOBIZ_USERNAME", ""),
+    "VOBIZ_PASSWORD":          os.getenv("VOBIZ_PASSWORD", ""),
+    "VOBIZ_OUTBOUND_NUMBER":   os.getenv("VOBIZ_OUTBOUND_NUMBER", ""),
+    "OUTBOUND_TRUNK_ID":       os.getenv("OUTBOUND_TRUNK_ID", ""),
+    "DEFAULT_TRANSFER_NUMBER": os.getenv("DEFAULT_TRANSFER_NUMBER", ""),
+    "SUPABASE_URL":            os.getenv("SUPABASE_URL", ""),
+    "SUPABASE_SERVICE_KEY":    os.getenv("SUPABASE_SERVICE_KEY", ""),
+    "APP_COUNTRY":             os.getenv("APP_COUNTRY", DEFAULT_COUNTRY),
+    "APP_COUNTRY_CODE":        os.getenv("APP_COUNTRY_CODE", DEFAULT_COUNTRY_CODE),
+    "PHONE_FORMAT":            os.getenv("PHONE_FORMAT", DEFAULT_PHONE_FORMAT),
+    "APP_TIMEZONE":            os.getenv("APP_TIMEZONE", DEFAULT_TIMEZONE),
+    "APPOINTMENT_TIMEZONE":    os.getenv("APPOINTMENT_TIMEZONE", os.getenv("APP_TIMEZONE", DEFAULT_TIMEZONE)),
+    "WHATSAPP_DISPLAY_TIMEZONE": os.getenv("WHATSAPP_DISPLAY_TIMEZONE", os.getenv("APP_TIMEZONE", DEFAULT_TIMEZONE)),
+    "DEEPGRAM_API_KEY":        os.getenv("DEEPGRAM_API_KEY", ""),
+    "RECORDING_AUTO_DELETE_ENABLED": os.getenv("RECORDING_AUTO_DELETE_ENABLED", "false"),
+    "RECORDING_RETENTION_DAYS":      os.getenv("RECORDING_RETENTION_DAYS", "7"),
+    "RECORDING_CLEANUP_TIME":        os.getenv("RECORDING_CLEANUP_TIME", "02:00"),
+    "TELEGRAM_BOT_TOKEN":            os.getenv("TELEGRAM_BOT_TOKEN", ""),
+    "TELEGRAM_CHAT_ID":              os.getenv("TELEGRAM_CHAT_ID", ""),
+    "TELEGRAM_NOTIFICATIONS_ENABLED": os.getenv("TELEGRAM_NOTIFICATIONS_ENABLED", "false"),
+    "FOLLOWUP_ENABLED": os.getenv("FOLLOWUP_ENABLED", "true"),
+    "FOLLOWUP_TIMEZONE": os.getenv("FOLLOWUP_TIMEZONE", DEFAULT_TIMEZONE),
+    "FOLLOWUP_MAX_CALLS_PER_DAY": os.getenv("FOLLOWUP_MAX_CALLS_PER_DAY", "2"),
+    "FOLLOWUP_MAX_CALL_ATTEMPTS_TOTAL": os.getenv("FOLLOWUP_MAX_CALL_ATTEMPTS_TOTAL", "3"),
+    "FOLLOWUP_MAX_WHATSAPP_FOLLOWUPS": os.getenv("FOLLOWUP_MAX_WHATSAPP_FOLLOWUPS", "3"),
+    "FOLLOWUP_WELCOME_NO_RESPONSE_CALL_DELAY_MINUTES": os.getenv("FOLLOWUP_WELCOME_NO_RESPONSE_CALL_DELAY_MINUTES", "30"),
+    "FOLLOWUP_NO_RESPONSE_TEMPLATE_DELAY_HOURS": os.getenv("FOLLOWUP_NO_RESPONSE_TEMPLATE_DELAY_HOURS", "24"),
+    "FOLLOWUP_BUSY_RETRY_DELAY_HOURS": os.getenv("FOLLOWUP_BUSY_RETRY_DELAY_HOURS", "2"),
+    "FOLLOWUP_DEMO_REMINDER_24H": os.getenv("FOLLOWUP_DEMO_REMINDER_24H", "true"),
+    "FOLLOWUP_DEMO_REMINDER_2H": os.getenv("FOLLOWUP_DEMO_REMINDER_2H", "true"),
+    "FOLLOWUP_DEMO_REMINDER_15M": os.getenv("FOLLOWUP_DEMO_REMINDER_15M", "true"),
+    "FOLLOWUP_STOP_ON_NOT_INTERESTED": os.getenv("FOLLOWUP_STOP_ON_NOT_INTERESTED", "true"),
+    "FOLLOWUP_STOP_ON_WRONG_NUMBER": os.getenv("FOLLOWUP_STOP_ON_WRONG_NUMBER", "true"),
+    "GOOGLE_CALENDAR_ENABLED": os.getenv("GOOGLE_CALENDAR_ENABLED", "false"),
+    "GOOGLE_MEET_ENABLED": os.getenv("GOOGLE_MEET_ENABLED", "false"),
+    "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON": os.getenv("GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON", ""),
+    "GOOGLE_CALENDAR_DEFAULT_TIMEZONE": os.getenv("GOOGLE_CALENDAR_DEFAULT_TIMEZONE", os.getenv("APP_TIMEZONE", DEFAULT_TIMEZONE)),
+    "GOOGLE_CALENDAR_FALLBACK_TO_INTERNAL": os.getenv("GOOGLE_CALENDAR_FALLBACK_TO_INTERNAL", "true"),
+    "AUTH_ENABLED": os.getenv("AUTH_ENABLED", "false"),
+    "ADMIN_API_KEY": os.getenv("ADMIN_API_KEY", ""),
+    "WEBHOOK_VERIFY_TOKEN": os.getenv("WEBHOOK_VERIFY_TOKEN", ""),
+    "COST_GEMINI_VOICE_PER_MINUTE": os.getenv("COST_GEMINI_VOICE_PER_MINUTE", "0"),
+    "COST_SIP_PER_MINUTE": os.getenv("COST_SIP_PER_MINUTE", "0"),
+    "COST_RECORDING_PER_MINUTE": os.getenv("COST_RECORDING_PER_MINUTE", "0"),
+    "COST_WHATSAPP_TEMPLATE": os.getenv("COST_WHATSAPP_TEMPLATE", "0"),
+    "COST_WHATSAPP_FREE_TEXT": os.getenv("COST_WHATSAPP_FREE_TEXT", "0"),
+    "COST_CURRENCY": os.getenv("COST_CURRENCY", DEFAULT_CURRENCY),
+}
+
+AIRCON_PIPELINE_STATUSES = [
+    ("New Enquiry", "#64748b"),
+    ("Issue Diagnosed", "#8b5cf6"),
+    ("Service Scheduled", "#2563eb"),
+    ("Technician Dispatched", "#0284c7"),
+    ("Servicing In Progress", "#eab308"),
+    ("Parts / Quote Shared", "#f59e0b"),
+    ("Service Completed", "#10b981"),
+    ("Payment Received", "#059669"),
+    ("AMC Pitch / Proposed", "#6366f1"),
+    ("AMC Contract Active", "#22c55e"),
+    ("Follow-up Due (3 Months)", "#f97316"),
+    ("Cancelled / Lost", "#dc2626"),
+]
+
+INTERIOR_PIPELINE_STATUSES = [
+    ("New Enquiry", "#64748b"),
+    ("Requirement Collected", "#8b5cf6"),
+    ("Site Visit Scheduled", "#2563eb"),
+    ("Site Visit Completed", "#7c3aed"),
+    ("2D/3D Design in Progress", "#6366f1"),
+    ("Quotation Shared", "#f59e0b"),
+    ("Advance Received / Deal Won", "#10b981"),
+    ("Project In Progress", "#3b82f6"),
+    ("Handover Completed", "#059669"),
+    ("Lost / Not Interested", "#dc2626"),
+]
+
+DENTAL_PIPELINE_STATUSES = [
+    ("New Patient Enquiry", "#64748b"),
+    ("Symptoms Evaluated", "#8b5cf6"),
+    ("Consultation Scheduled", "#2563eb"),
+    ("Token / Slot Confirmed", "#0284c7"),
+    ("Doctor Consultation Done", "#10b981"),
+    ("Treatment Plan In Progress", "#f59e0b"),
+    ("Treatment Completed", "#059669"),
+    ("Follow-up Due", "#f97316"),
+    ("No Show / Cancelled", "#dc2626"),
+]
+
+REALESTATE_PIPELINE_STATUSES = [
+    ("New Lead Received", "#64748b"),
+    ("Requirements Qualified", "#8b5cf6"),
+    ("Brochure & Options Shared", "#06b6d4"),
+    ("Site Visit Scheduled", "#2563eb"),
+    ("Site Visit Completed", "#7c3aed"),
+    ("Second Visit / Family Discussion", "#6366f1"),
+    ("Price Negotiation", "#f59e0b"),
+    ("Token Advance Paid", "#10b981"),
+    ("Agreement & Loan Processing", "#059669"),
+    ("Deal Closed Won", "#22c55e"),
+    ("Lost / Budget Mismatch", "#dc2626"),
+]
+
+BUILDER_PIPELINE_STATUSES = [
+    ("Campaign Enquiry", "#64748b"),
+    ("Unit Preference Noted", "#8b5cf6"),
+    ("Project Brochure Delivered", "#06b6d4"),
+    ("Sales Lounge Tour Booked", "#2563eb"),
+    ("Site Tour Completed", "#7c3aed"),
+    ("Unit Blocked / EOI Submitted", "#f59e0b"),
+    ("Agreement Signed", "#10b981"),
+    ("Construction Milestone Due", "#f97316"),
+    ("Possession Handover", "#059669"),
+    ("Enquiry Dropped", "#dc2626"),
+]
+
+MARKETING_AGENCY_PIPELINE_STATUSES = [
+    ("New Lead Received", "#64748b"),
+    ("Discovery Call Scheduled", "#8b5cf6"),
+    ("Requirement & Audit Done", "#06b6d4"),
+    ("Proposal / Pitch Shared", "#f59e0b"),
+    ("Retainer / Deal Closed", "#10b981"),
+    ("Onboarding & Setup Live", "#3b82f6"),
+    ("Campaigns & Automations Active", "#22c55e"),
+    ("Monthly Retainer Active", "#16a34a"),
+    ("Upsell / Expansion Pitch", "#6366f1"),
+    ("Paused / Lost", "#dc2626"),
+]
+
+PIPELINE_PRESETS = {
+    "agency": [
+        {"name": name, "color": color} for name, color in MARKETING_AGENCY_PIPELINE_STATUSES
+    ],
+    "marketing": [
+        {"name": name, "color": color} for name, color in MARKETING_AGENCY_PIPELINE_STATUSES
+    ],
+    "aircon": [
+        {"name": name, "color": color} for name, color in AIRCON_PIPELINE_STATUSES
+    ],
+    "interior": [
+        {"name": name, "color": color} for name, color in INTERIOR_PIPELINE_STATUSES
+    ],
+    "dental": [
+        {"name": name, "color": color} for name, color in DENTAL_PIPELINE_STATUSES
+    ],
+    "realestate": [
+        {"name": name, "color": color} for name, color in REALESTATE_PIPELINE_STATUSES
+    ],
+    "builder": [
+        {"name": name, "color": color} for name, color in BUILDER_PIPELINE_STATUSES
+    ],
+}
+
+DEFAULT_LEAD_STATUSES = [
+    # Air Conditioning Service Pipeline
+    ("New Enquiry", "#64748b"),
+    ("Issue Diagnosed", "#8b5cf6"),
+    ("Service Scheduled", "#2563eb"),
+    ("Technician Dispatched", "#0284c7"),
+    ("Servicing In Progress", "#eab308"),
+    ("Parts / Quote Shared", "#f59e0b"),
+    ("Service Completed", "#10b981"),
+    ("Payment Received", "#059669"),
+    ("AMC Pitch / Proposed", "#6366f1"),
+    ("AMC Contract Active", "#22c55e"),
+    ("Follow-up Due (3 Months)", "#f97316"),
+    # Interior Design Pipeline
+    ("Requirement Collected", "#8b5cf6"),
+    ("Site Visit Scheduled", "#2563eb"),
+    ("Site Visit Completed", "#7c3aed"),
+    ("2D/3D Design in Progress", "#6366f1"),
+    ("Quotation Shared", "#f59e0b"),
+    ("Advance Received / Deal Won", "#10b981"),
+    ("Project In Progress", "#3b82f6"),
+    ("Handover Completed", "#059669"),
+    # Standard & Telephony Stages
+    ("New Lead", "#64748b"),
+    ("New", "#64748b"),
+    ("Hot Lead", "#ef4444"),
+    ("Quote Given", "#f59e0b"),
+    ("Measurement Taken", "#06b6d4"),
+    ("Home Visit Booked", "#3b82f6"),
+    ("Site Visit Booked", "#2563eb"),
+    ("Home Visit Done", "#8b5cf6"),
+    ("Site Visit Done", "#7c3aed"),
+    ("Follow-up Later", "#eab308"),
+    ("Payment Pending", "#f97316"),
+    ("Closed Won", "#22c55e"),
+    ("Closed Lost", "#6b7280"),
+    ("Not Interested", "#dc2626"),
+    ("Wrong Number", "#9ca3af"),
+    ("No Response", "#94a3b8"),
+    ("callback_requested", "#f59e0b"),
+    ("message_followup_requested", "#06b6d4"),
+    ("whatsapp_no_response", "#94a3b8"),
+    ("first_call_no_answer", "#f97316"),
+    ("first_call_busy", "#f97316"),
+    ("demo_booked", "#3b82f6"),
+    ("demo_reminder_due", "#6366f1"),
+    ("demo_no_response", "#a855f7"),
+    ("demo_no_show", "#dc2626"),
+    ("demo_reschedule_requested", "#8b5cf6"),
+    ("not_interested", "#dc2626"),
+    ("wrong_number", "#9ca3af"),
+    ("do_not_contact", "#111827"),
+    ("converted", "#22c55e"),
+    ("lost", "#6b7280"),
+]
+
+CRM_LEAD_FIELDS = [
+    "phone_number", "lead_name", "email", "city", "location", "address", "requirement",
+    "budget", "source", "business_name", "campaign_name", "service_type",
+    "lead_country", "lead_country_code", "crm_status", "custom_status",
+    "crm_notes", "next_followup_at", "assigned_to",
+    "upload_batch_id", "import_source", "last_synced_at",
+    "tags_json", "custom_fields_json",
+]
+
+
+def _default(key: str) -> str:
+    return os.getenv(key, DEFAULTS.get(key, ""))
+
+
+def canonical_lead_source(source: str, fallback: str = DEFAULT_CRM_SOURCE) -> str:
+    compact = re.sub(r"[^a-z0-9]+", "", str(source or "").strip().lower())
+    if compact in {"whatsapp", "whatsappchat", "wainbound", "whatsappinbound"}:
+        return "WhatsApp"
+    if compact in {"voice", "voicecall", "call", "phonecall", "outboundcall", "inboundcall"}:
+        return "Voice Call"
+    if compact in {"website", "web", "site", "webform", "landingpage"}:
+        return "Website"
+    return fallback
+
+
+def normalize_phone(phone: str) -> str:
+    """Normalize Singapore/E.164 phone numbers, preserving other E.164 values.
+
+    Accepted Singapore inputs (all map to ``+6590000000``):
+        90000000
+        6590000000
+        +6590000000
+        006590000000
+
+    Generic E.164 numbers (e.g. ``+14155551234``) are preserved.
+    """
+    raw = str(phone or "").strip()
+    # Strip surrounding quotes and Google Sheets leading apostrophe text-marker
+    if raw and raw[0] in ("'", '"'):
+        raw = raw[1:].strip()
+    if raw and raw[-1] in ("'", '"'):
+        raw = raw[:-1].strip()
+    # Handle scientific notation that Sheets/Excel sometimes produces
+    # (e.g. "6.590000000e9" → "6590000000")
+    if raw and ("e" in raw.lower()) and re.match(r"^[+-]?\d+(\.\d+)?[eE][+-]?\d+$", raw):
+        try:
+            raw = str(int(float(raw)))
+        except Exception:
+            pass
+    if raw.endswith(".0"):
+        raw = raw[:-2]
+    if not raw:
+        raise ValueError("Invalid phone number")
+    if raw.startswith("+"):
+        digits = "+" + re.sub(r"\D", "", raw)
+    else:
+        digits = re.sub(r"\D", "", raw)
+        # International "00" prefix (e.g. 006590000000 → +6590000000)
+        if len(digits) >= 11 and digits.startswith("00"):
+            digits = "+" + digits[2:]
+        elif len(digits) == 8:
+            digits = DEFAULT_COUNTRY_CODE + digits
+        elif len(digits) == 9 and digits.startswith("0"):
+            digits = DEFAULT_COUNTRY_CODE + digits[1:]
+        elif len(digits) == 10 and digits.startswith("65"):
+            digits = "+" + digits
+        else:
+            digits = "+" + digits
+    if not digits.startswith("+"):
+        raise ValueError("Invalid phone number")
+    body = digits[1:]
+    if not body.isdigit() or len(body) < 8 or len(body) > 15:
+        raise ValueError("Invalid phone number")
+    return digits
+
+
+def _clean_value(value):
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text if text else None
+
+
+SUPABASE_URL = _default("SUPABASE_URL")
+SUPABASE_KEY = _default("SUPABASE_SERVICE_KEY")
+
+SENSITIVE_KEYS = {
+    "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "GOOGLE_API_KEY",
+    "VOBIZ_PASSWORD", "TWILIO_AUTH_TOKEN", "SUPABASE_SERVICE_KEY",
+    "AWS_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "CALCOM_API_KEY",
+    "DEEPGRAM_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
+    "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON", "ADMIN_API_KEY",
+    "WEBHOOK_VERIFY_TOKEN", "WHATSAPP_ACCESS_TOKEN", "WHATSAPP_VERIFY_TOKEN",
+    "VOBIZ_AUTH_TOKEN", "VOBIZ_WEBHOOK_SECRET",
+}
+
+
+def _is_sensitive_setting(key: str) -> bool:
+    key_u = str(key or "").upper()
+    if key_u in SENSITIVE_KEYS:
+        return True
+    if any(token in key_u for token in ("SECRET", "TOKEN", "PASSWORD", "PRIVATE_KEY", "SERVICE_ACCOUNT")):
+        return True
+    return key_u.endswith("_API_KEY") or key_u.endswith("_SERVICE_KEY")
+
+
+class ConfigError(Exception):
+    """Raised when a required env var is missing — surfaced as HTTP 503 by the server."""
+
+
+class DuplicateContactError(Exception):
+    """Raised by upsert_crm_lead when forbid_duplicate=True and a CRM contact
+    already exists for the normalized phone number. The server maps this to
+    HTTP 409 so the Add-Lead UI can show a friendly 'lead already exists' error."""
+
+    def __init__(self, phone: str, existing: Optional[dict] = None):
+        super().__init__(f"CRM contact already exists for {phone}")
+        self.phone = phone
+        self.existing = existing or {}
+
+
+def _require_supabase() -> tuple:
+    url = _default("SUPABASE_URL")
+    key = _default("SUPABASE_SERVICE_KEY")
+    if not url or not key:
+        raise ConfigError(
+            "Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_KEY "
+            "as env vars in your VPS / Coolify deployment."
+        )
+    return url, key
+
+
+_cached_adb_by_loop = {}
+_cached_sdb = None
+
+
+def _sdb():
+    global _cached_sdb
+    if _cached_sdb is None:
+        url, key = _require_supabase()
+        from supabase import create_client
+        _cached_sdb = create_client(url, key)
+    return _cached_sdb
+
+
+async def _adb():
+    global _cached_adb_by_loop
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop is not None:
+        if loop not in _cached_adb_by_loop:
+            url, key = _require_supabase()
+            from supabase._async.client import create_client
+            _cached_adb_by_loop[loop] = await create_client(url, key)
+        return _cached_adb_by_loop[loop]
+    else:
+        url, key = _require_supabase()
+        from supabase._async.client import create_client
+        return await create_client(url, key)
+
+
+def get_repository():
+    """Return the configured database repository.
+
+    Supabase remains the default.  MySQL is selected only when
+    AIRZEN_DB_BACKEND=mysql is explicitly configured.
+    """
+    from airzen_repository import get_cached_repository
+    return get_cached_repository(_adb)
+
+
+async def repository_backend_health() -> dict:
+    """Return the active repository backend health summary."""
+    return await get_repository().backend_health_check()
+
+
+async def _init_db_settings_probe(backend: str) -> None:
+    try:
+        await get_repository().list_settings()
+        print(f"[OK] {'Supabase' if backend == 'supabase' else 'MySQL'} connected")
+    except Exception as exc:
+        label = "Supabase" if backend == "supabase" else "MySQL"
+        print(f"[!] {label} connection failed: {exc}")
+        if backend == "supabase":
+            print("   Run supabase_schema.sql in your Supabase Dashboard → SQL Editor")
+
+
+def init_db() -> Optional[asyncio.Task]:
+    from airzen_repository import configured_backend
+
+    backend = configured_backend()
+    if backend == "supabase":
+        url = os.getenv("SUPABASE_URL", SUPABASE_URL)
+        key = os.getenv("SUPABASE_SERVICE_KEY", SUPABASE_KEY)
+        if not url or not key:
+            print("[!] SUPABASE_URL or SUPABASE_SERVICE_KEY not set.")
+            return
+    probe = _init_db_settings_probe(backend)
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(probe)
+        return None
+    else:
+        return loop.create_task(probe)
+
+
+async def get_all_settings() -> dict:
+    try:
+        stored_settings = await get_repository().list_settings()
+    except ConfigError:
+        # Supabase not set — still return env-only view so the UI works.
+        stored_settings = {}
+    known_keys = [
+        "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
+        "GOOGLE_API_KEY", "GEMINI_MODEL", "GEMINI_TTS_VOICE", "USE_GEMINI_REALTIME",
+        "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
+        "APP_COUNTRY", "APP_COUNTRY_CODE", "PHONE_FORMAT",
+        "VOBIZ_SIP_DOMAIN", "VOBIZ_USERNAME", "VOBIZ_PASSWORD",
+        "VOBIZ_OUTBOUND_NUMBER", "OUTBOUND_TRUNK_ID", "DEFAULT_TRANSFER_NUMBER",
+        "DEEPGRAM_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER",
+        "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_ENDPOINT_URL", "S3_REGION", "S3_BUCKET",
+        "CALCOM_API_KEY", "CALCOM_EVENT_TYPE_ID", "CALCOM_TIMEZONE", "ENABLED_TOOLS",
+        "RECORDING_AUTO_DELETE_ENABLED", "RECORDING_RETENTION_DAYS", "RECORDING_CLEANUP_TIME",
+        "GOOGLE_CALENDAR_ENABLED", "GOOGLE_MEET_ENABLED", "GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON",
+        "GOOGLE_CALENDAR_DEFAULT_TIMEZONE", "GOOGLE_CALENDAR_FALLBACK_TO_INTERNAL",
+        "AUTH_ENABLED", "ADMIN_API_KEY", "WEBHOOK_VERIFY_TOKEN",
+        "COST_GEMINI_VOICE_PER_MINUTE", "COST_SIP_PER_MINUTE", "COST_RECORDING_PER_MINUTE",
+        "COST_WHATSAPP_TEMPLATE", "COST_WHATSAPP_FREE_TEXT", "COST_CURRENCY",
+        "DEMO_COMPLETION_CHECK_ENABLED", "DEMO_COMPLETION_CHECK_DELAY_MINUTES",
+        "DEMO_COMPLETION_STAFF_TEMPLATE", "DEMO_COMPLETION_USE_TEMPLATE",
+        "DEMO_COMPLETION_MAX_REQUESTS", "DEMO_COMPLETION_REQUEST_COOLDOWN_MINUTES",
+    ]
+    out = {}
+    for k in known_keys:
+        env_val = os.getenv(k, "")
+        out[k] = {
+            "value": "" if _is_sensitive_setting(k) else env_val,
+            "configured": bool(env_val),
+            "source": "env" if env_val else "none",
+        }
+    # DB values only fill in what VPS env vars did not already set.
+    for k, v in stored_settings.items():
+        if k == "TEST_KEY":
+            continue
+        if out.get(k, {}).get("source") == "env":
+            continue  # env wins — never overwrite
+        out[k] = {
+            "value": "" if _is_sensitive_setting(k) else v,
+            "configured": bool(v),
+            "source": "db" if v else "none",
+        }
+    return out
+
+
+async def save_settings(data: dict) -> None:
+    settings = {k: str(v) for k, v in data.items() if v is not None and v != ""}
+    if settings:
+        await get_repository().set_settings(settings)
+
+
+async def get_setting(key: str, default: str = "") -> str:
+    # VPS/container env vars are the single source of truth.
+    # Fall back to the Supabase `settings` table only when the env var is unset.
+    env_val = os.getenv(key, "")
+    if env_val:
+        return env_val
+    try:
+        value = await get_repository().get_setting(key)
+        if value:
+            return value
+    except Exception:
+        pass
+    return default
+
+
+async def set_setting(key: str, value: str) -> None:
+    await get_repository().set_setting(key, value)
+
+
+async def get_enabled_tools() -> list:
+    raw = await get_setting("ENABLED_TOOLS", "")
+    if not raw:
+        return []
+    try:
+        import json
+        result = json.loads(raw)
+        return result if isinstance(result, list) else []
+    except Exception:
+        return []
+
+
+async def log_error(source: str, message: str, detail: str = "", level: str = "error") -> None:
+    try:
+        await get_repository().create_error_log({"id": str(uuid.uuid4()), "source": source, "level": level, "message": message[:500], "detail": detail[:2000], "timestamp": datetime.now().isoformat()})
+    except Exception:
+        pass
+
+
+async def log_errors_batch(logs: list[dict]) -> None:
+    if not logs:
+        return
+    try:
+        await get_repository().create_error_logs(logs)
+    except Exception:
+        pass
+
+
+
+async def get_errors(limit: int = 100) -> list:
+    return await get_repository().list_error_logs(limit=limit)
+
+
+async def get_logs(level: Optional[str] = None, source: Optional[str] = None, limit: int = 200) -> list:
+    return await get_repository().list_error_logs(level=level or "", source=source or "", limit=limit)
+
+
+async def clear_errors() -> None:
+    await get_repository().clear_error_logs()
+
+
+async def clear_call_logs() -> int:
+    return await get_repository().clear_call_logs()
+
+
+async def clear_error_logs() -> int:
+    return await get_repository().clear_error_logs()
+
+
+async def clear_contact_memory() -> int:
+    return await get_repository().clear_contact_memory()
+
+
+async def clear_appointments() -> int:
+    return await get_repository().clear_appointments()
+
+
+async def clear_campaigns() -> int:
+    return await get_repository().clear_campaigns()
+
+
+async def clear_all_test_data() -> dict:
+    return {
+        "call_logs": await clear_call_logs(),
+        "error_logs": await clear_error_logs(),
+        "contact_memory": await clear_contact_memory(),
+        "appointments": await clear_appointments(),
+        "campaigns": await clear_campaigns(),
+    }
+
+
+APPOINTMENT_SETTING_DEFAULTS = {
+    "demo_duration_minutes": 30,
+    "buffer_minutes": 15,
+    "slot_interval_minutes": 0,
+    "timezone": DEFAULT_TIMEZONE,
+    "minimum_notice_minutes": 30,
+    "max_booking_days_ahead": 30,
+    "customer_reminder_enabled": 1,
+    "staff_reminder_enabled": 1,
+    "telegram_reminder_enabled": 0,
+    "reminder_before_minutes": 60,
+    "appointment_name": "Dental Consultation / Checkup",
+    "default_service_type": "Dental Checkup & Consultation",
+    "delivery_mode": "in_clinic",
+    "location_label": "Clinic Address (Kapra, ECIL)",
+    "staff_label": "Doctor / Specialist",
+    "default_staff_role": "dental_specialist",
+    "assignment_strategy": "round_robin",
+    "intake_prompt": "Before I confirm your dental visit, please let me know the patient name, age, primary dental concern (e.g. Toothache, Dental Implants, Root Canal, Braces/Aligners, Cleaning), and preferred doctor or time slot.",
+}
+
+APPOINTMENT_BOOL_SETTINGS = {
+    "customer_reminder_enabled",
+    "staff_reminder_enabled",
+    "telegram_reminder_enabled",
+}
+
+APPOINTMENT_TEXT_SETTINGS = {
+    "timezone",
+    "appointment_name",
+    "default_service_type",
+    "delivery_mode",
+    "location_label",
+    "staff_label",
+    "default_staff_role",
+    "assignment_strategy",
+    "intake_prompt",
+}
+
+
+async def get_appointment_settings() -> dict:
+    out = dict(APPOINTMENT_SETTING_DEFAULTS)
+    for key, default in APPOINTMENT_SETTING_DEFAULTS.items():
+        raw = await get_setting(f"APPOINTMENT_{key.upper()}", str(default))
+        if key in APPOINTMENT_TEXT_SETTINGS:
+            out[key] = raw or default
+        else:
+            try:
+                out[key] = max(int(raw), 0)
+            except (TypeError, ValueError):
+                out[key] = default
+    if not out["slot_interval_minutes"]:
+        out["slot_interval_minutes"] = out["demo_duration_minutes"] + out["buffer_minutes"]
+    out["duration_minutes"] = out["demo_duration_minutes"]
+    return out
+
+
+async def save_appointment_settings(settings: dict) -> dict:
+    if "duration_minutes" in settings and "demo_duration_minutes" not in settings:
+        settings = {**settings, "demo_duration_minutes": settings.get("duration_minutes")}
+    clean = dict(APPOINTMENT_SETTING_DEFAULTS)
+    for key in clean:
+        if key not in settings:
+            continue
+        if key in APPOINTMENT_TEXT_SETTINGS:
+            clean[key] = str(settings.get(key) or APPOINTMENT_SETTING_DEFAULTS[key]).strip() or APPOINTMENT_SETTING_DEFAULTS[key]
+        else:
+            try:
+                clean[key] = max(int(settings.get(key)), 0)
+            except (TypeError, ValueError):
+                clean[key] = APPOINTMENT_SETTING_DEFAULTS[key]
+    if not clean["slot_interval_minutes"]:
+        clean["slot_interval_minutes"] = clean["demo_duration_minutes"] + clean["buffer_minutes"]
+    if clean["delivery_mode"].lower() not in {"onsite", "online", "phone", "hybrid"}:
+        clean["delivery_mode"] = APPOINTMENT_SETTING_DEFAULTS["delivery_mode"]
+    else:
+        clean["delivery_mode"] = clean["delivery_mode"].lower()
+    clean["assignment_strategy"] = "round_robin"
+    clean["timezone"] = _validate_iana_timezone(clean["timezone"])
+    clean["default_staff_role"] = str(clean["default_staff_role"] or "").strip()
+    if not clean["default_staff_role"]:
+        raise ValueError("Default staff role is required")
+    await save_settings({f"APPOINTMENT_{k.upper()}": v for k, v in clean.items()})
+    clean["duration_minutes"] = clean["demo_duration_minutes"]
+    return clean
+
+
+def _parse_hhmm(value: str) -> dt_time:
+    return datetime.strptime((value or "00:00")[:5], "%H:%M").time()
+
+
+def _appointment_tz(settings: Optional[dict] = None) -> ZoneInfo:
+    tz_name = str((settings or {}).get("timezone") or DEFAULT_TIMEZONE).strip() or DEFAULT_TIMEZONE
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:
+        return ZoneInfo(DEFAULT_TIMEZONE)
+
+
+def _appointment_now_local(settings: Optional[dict] = None) -> datetime:
+    # Appointment date/time columns are local wall-clock values; DB timestamps remain raw/UTC elsewhere.
+    return datetime.now(_appointment_tz(settings)).replace(tzinfo=None)
+
+
+def _truthy(value) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
+async def _calendar_settings() -> dict:
+    return {
+        "enabled": _truthy(await get_setting("GOOGLE_CALENDAR_ENABLED", "false")),
+        "meet_enabled": _truthy(await get_setting("GOOGLE_MEET_ENABLED", "false")),
+        "service_account_json": await get_setting("GOOGLE_CALENDAR_SERVICE_ACCOUNT_JSON", ""),
+        "timezone": await get_setting("GOOGLE_CALENDAR_DEFAULT_TIMEZONE", DEFAULT_TIMEZONE) or DEFAULT_TIMEZONE,
+        "fallback_internal": _truthy(await get_setting("GOOGLE_CALENDAR_FALLBACK_TO_INTERNAL", "true")),
+    }
+
+
+def _google_service_account_info(raw_json: str) -> Optional[dict]:
+    raw_json = (raw_json or "").strip()
+    if not raw_json:
+        return None
+    try:
+        parsed = _json_mod.loads(raw_json)
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+async def _google_calendar_service(settings: dict):
+    info = _google_service_account_info(settings.get("service_account_json") or "")
+    if not info:
+        return None
+    try:
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+        scopes = ["https://www.googleapis.com/auth/calendar"]
+        creds = service_account.Credentials.from_service_account_info(info, scopes=scopes)
+        return build("calendar", "v3", credentials=creds, cache_discovery=False)
+    except Exception as exc:
+        await log_error("calendar", "google_calendar_check_failed", f"service_build_failed={str(exc)[:500]}", "warning")
+        return None
+
+
+async def _google_calendar_busy(staff: dict, start: datetime, end: datetime, settings: dict) -> Optional[bool]:
+    calendar_id = (staff.get("google_calendar_id") or staff.get("calendar_email") or "").strip()
+    if not (settings.get("enabled") and staff.get("google_calendar_connected") and calendar_id):
+        return None
+    await log_error("calendar", "google_calendar_check_started", f"staff_id={staff.get('id')}; calendar_id={calendar_id}; start={start.isoformat()}; end={end.isoformat()}", "info")
+    service = await _google_calendar_service(settings)
+    if service is None:
+        await log_error("calendar", "google_calendar_check_failed", f"staff_id={staff.get('id')}; reason=service_unavailable", "warning")
+        return None
+    tz = _appointment_tz({"timezone": staff.get("timezone") or settings.get("timezone") or DEFAULT_TIMEZONE})
+    start_aware = start.replace(tzinfo=tz)
+    end_aware = end.replace(tzinfo=tz)
+    try:
+        body = {
+            "timeMin": start_aware.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z"),
+            "timeMax": end_aware.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z"),
+            "items": [{"id": calendar_id}],
+        }
+        result = await asyncio.wait_for(
+            asyncio.to_thread(service.freebusy().query(body=body).execute),
+            timeout=3.0,
+        )
+        busy = bool(((result.get("calendars") or {}).get(calendar_id) or {}).get("busy") or [])
+        await log_error("calendar", "google_calendar_check_success", f"staff_id={staff.get('id')}; calendar_id={calendar_id}; busy={str(busy).lower()}", "info")
+        return busy
+    except Exception as exc:
+        await log_error("calendar", "google_calendar_check_failed", f"staff_id={staff.get('id')}; calendar_id={calendar_id}; error={str(exc)[:500]}", "warning")
+        try:
+            await get_repository().update_appointment_staff_calendar(staff.get("id"), {
+                "calendar_sync_error": str(exc)[:500],
+                "last_calendar_sync_at": datetime.now().isoformat(),
+            })
+        except Exception:
+            pass
+        return None
+
+
+async def _create_google_calendar_event(staff: dict, row: dict, start: datetime, settings: dict) -> dict:
+    calendar_settings = await _calendar_settings()
+    calendar_id = (staff.get("google_calendar_id") or staff.get("calendar_email") or "").strip()
+    if not (calendar_settings.get("enabled") and staff and staff.get("google_calendar_connected") and calendar_id):
+        return {}
+    await log_error("calendar", "google_meet_create_started", f"appointment_id={row.get('id')}; staff_id={staff.get('id')}; calendar_id={calendar_id}", "info")
+    service = await _google_calendar_service(calendar_settings)
+    if service is None:
+        await log_error("calendar", "google_meet_create_failed", f"appointment_id={row.get('id')}; reason=service_unavailable", "warning")
+        return {"error": "service_unavailable"}
+    tz = _appointment_tz(settings)
+    duration = int(row.get("duration_minutes") or settings.get("demo_duration_minutes") or 30)
+    start_aware = start.replace(tzinfo=tz)
+    end_aware = (start + timedelta(minutes=duration)).replace(tzinfo=tz)
+    body = {
+        "summary": f"{row.get('service') or settings.get('appointment_name') or 'Appointment'} - {row.get('name') or 'Customer'}",
+        "description": f"Phone: {row.get('phone') or ''}",
+        "start": {"dateTime": start_aware.isoformat(), "timeZone": settings.get("timezone") or DEFAULT_TIMEZONE},
+        "end": {"dateTime": end_aware.isoformat(), "timeZone": settings.get("timezone") or DEFAULT_TIMEZONE},
+    }
+    kwargs = {"calendarId": calendar_id, "body": body}
+    if calendar_settings.get("meet_enabled") and staff.get("google_meet_enabled") and settings.get("delivery_mode") == "online":
+        body["conferenceData"] = {"createRequest": {"requestId": row.get("id") or str(uuid.uuid4())}}
+        kwargs["conferenceDataVersion"] = 1
+    try:
+        event = await asyncio.wait_for(
+            asyncio.to_thread(service.events().insert(**kwargs).execute),
+            timeout=5.0,
+        )
+        event_id = event.get("id") or ""
+        link = event.get("hangoutLink") or ((event.get("conferenceData") or {}).get("entryPoints") or [{}])[0].get("uri") or ""
+        await log_error("calendar", "google_meet_create_success", f"appointment_id={row.get('id')}; event_id={event_id}; has_link={str(bool(link)).lower()}", "info")
+        return {"calendar_event_id": event_id, "meet_link": link, "google_meet_link": link}
+    except Exception as exc:
+        await log_error("calendar", "google_meet_create_failed", f"appointment_id={row.get('id')}; error={str(exc)[:500]}", "warning")
+        return {"error": str(exc)[:500]}
+
+
+def _appointment_start(row: dict) -> Optional[datetime]:
+    try:
+        return datetime.strptime(f"{row.get('date')} {(row.get('time') or '')[:5]}", "%Y-%m-%d %H:%M")
+    except Exception:
+        return None
+
+
+def _staff_days(staff: dict) -> list:
+    raw = staff.get("working_days") or ""
+    if isinstance(raw, list):
+        values = raw
+    else:
+        values = None
+    try:
+        if values is None:
+            parsed = _json_mod.loads(raw)
+            if isinstance(parsed, list):
+                values = parsed
+    except Exception:
+        pass
+    if values is None:
+        values = str(raw or "").split(",")
+    # Malformed legacy values are ignored safely at read time. New writes are
+    # rejected by _normalize_staff_working_days rather than silently persisted.
+    allowed = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+    return [day for day in (str(x).strip().lower() for x in values) if day in allowed]
+
+
+def _normalize_staff_working_days(raw) -> list:
+    values = raw
+    if isinstance(raw, str):
+        try:
+            parsed = _json_mod.loads(raw)
+            values = parsed if isinstance(parsed, list) else raw.split(",")
+        except Exception:
+            values = raw.split(",")
+    if not isinstance(values, (list, tuple)):
+        raise ValueError("Working days must be a list using mon,tue,wed,thu,fri,sat,sun")
+    normalized = [str(value).strip().lower() for value in values if str(value).strip()]
+    allowed = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+    invalid = sorted(set(normalized) - allowed)
+    if invalid:
+        raise ValueError(f"Invalid working day: {', '.join(invalid)}")
+    if not normalized:
+        raise ValueError("At least one working day is required")
+    return list(dict.fromkeys(normalized))
+
+
+def _validate_iana_timezone(value: str, fallback: str = DEFAULT_TIMEZONE) -> str:
+    timezone_name = str(value or fallback).strip() or fallback
+    try:
+        ZoneInfo(timezone_name)
+    except Exception as exc:
+        raise ValueError("Timezone must be a valid IANA timezone") from exc
+    return timezone_name
+
+
+def _staff_available_for(staff: dict, start: datetime, appointment_timezone: str = DEFAULT_TIMEZONE) -> bool:
+    if not staff.get("active", True):
+        return False
+    if not str(staff.get("start_time") or "").strip() or not str(staff.get("end_time") or "").strip():
+        return False
+    days = _staff_days(staff)
+    if not days:
+        return False
+    try:
+        appointment_tz = ZoneInfo(str(appointment_timezone or DEFAULT_TIMEZONE))
+        staff_tz = ZoneInfo(str(staff.get("timezone") or appointment_timezone or DEFAULT_TIMEZONE))
+        requested = start if start.tzinfo else start.replace(tzinfo=appointment_tz)
+        staff_local = requested.astimezone(staff_tz)
+        start_time = _parse_hhmm(staff.get("start_time") or "09:00")
+        end_time = _parse_hhmm(staff.get("end_time") or "18:00")
+    except Exception:
+        return False
+    day = staff_local.strftime("%a").lower()
+    return day in days and start_time <= staff_local.time().replace(tzinfo=None) < end_time
+
+
+async def get_appointment_staff(include_inactive: bool = True) -> list:
+    try:
+        rows = await get_repository().list_appointment_staff(include_inactive=include_inactive)
+        for row in rows:
+            row["working_days"] = _staff_days(row)
+        return rows
+    except Exception as exc:
+        logger.warning("get_appointment_staff failed: %s", exc)
+        return []
+
+
+async def get_active_staff() -> list:
+    return await get_appointment_staff(include_inactive=False)
+
+
+async def upsert_appointment_staff(data: dict, staff_id: Optional[str] = None) -> dict:
+    appointment_settings = await get_appointment_settings()
+    now = datetime.now().isoformat()
+    working_days = _normalize_staff_working_days(
+        data.get("working_days") or ["mon", "tue", "wed", "thu", "fri", "sat"]
+    )
+    timezone_name = _validate_iana_timezone(
+        data.get("timezone"), appointment_settings.get("timezone") or DEFAULT_TIMEZONE
+    )
+    try:
+        start_time = _parse_hhmm(str(data.get("start_time") or "09:00"))
+        end_time = _parse_hhmm(str(data.get("end_time") or "18:00"))
+    except ValueError as exc:
+        raise ValueError("Staff start_time and end_time must use HH:MM") from exc
+    if start_time >= end_time:
+        raise ValueError("Staff end_time must be later than start_time")
+    role = str(data.get("role") or appointment_settings.get("default_staff_role") or "service_staff").strip()
+    if not role:
+        raise ValueError("Staff role is required")
+    row = {
+        "id": staff_id or str(uuid.uuid4()),
+        "name": str(data.get("name") or "").strip(),
+        "email": str(data.get("email") or "").strip(),
+        "whatsapp_number": str(data.get("whatsapp_number") or "").strip(),
+        "role": role,
+        "calendar_email": str(data.get("calendar_email") or "").strip(),
+        "google_calendar_id": str(data.get("google_calendar_id") or data.get("calendar_email") or "").strip(),
+        "google_calendar_connected": bool(data.get("google_calendar_connected", False)),
+        "google_meet_enabled": bool(data.get("google_meet_enabled", False)),
+        "notes": str(data.get("notes") or "").strip(),
+        "working_days": _json_mod.dumps(working_days),
+        "start_time": start_time.strftime("%H:%M"),
+        "end_time": end_time.strftime("%H:%M"),
+        "timezone": timezone_name,
+        "active": bool(data.get("active", True)),
+        "round_robin_order": int(data.get("round_robin_order") or 0),
+        "updated_at": now,
+    }
+    if not row["name"]:
+        raise ValueError("Staff name is required")
+    if not staff_id:
+        row["created_at"] = now
+    saved = await get_repository().upsert_appointment_staff(row, staff_id=staff_id)
+    saved["working_days"] = _staff_days(saved)
+    return saved
+
+
+async def deactivate_appointment_staff(staff_id: str) -> bool:
+    return await get_repository().set_appointment_staff_active(staff_id, False)
+
+
+async def activate_appointment_staff(staff_id: str) -> bool:
+    return await get_repository().set_appointment_staff_active(staff_id, True)
+
+
+async def delete_appointment_staff(staff_id: str) -> dict:
+    repository = get_repository()
+    if not await repository.get_appointment_staff(staff_id):
+        return {"deleted": False, "deactivated": False}
+    try:
+        if not await repository.delete_appointment_staff(staff_id):
+            ok = await deactivate_appointment_staff(staff_id)
+            return {"deleted": False, "deactivated": ok}
+        return {"deleted": True, "deactivated": False}
+    except Exception as exc:
+        logger.warning("delete_appointment_staff failed, deactivating instead: %s", exc)
+        ok = await deactivate_appointment_staff(staff_id)
+        return {"deleted": False, "deactivated": ok}
+
+
+async def _appointment_conflicts(staff_id: str, start: datetime, settings: dict) -> bool:
+    """Check the built-in appointment ledger only.
+
+    Google Calendar is optional meeting/sync integration. It is deliberately
+    excluded from booking availability so provider outages cannot block the
+    application's own scheduler.
+    """
+    end = start + timedelta(minutes=settings["demo_duration_minutes"] + settings["buffer_minutes"])
+    rows = await get_repository().get_booked_appointments_for_staff(staff_id)
+    new_end = end
+    for row in rows:
+        existing_start = _appointment_start(row)
+        if not existing_start:
+            continue
+        duration = int(row.get("duration_minutes") or settings["demo_duration_minutes"])
+        buffer = int(row.get("buffer_minutes") or settings["buffer_minutes"])
+        existing_end = existing_start + timedelta(minutes=duration + buffer)
+        if start < existing_end and existing_start < new_end:
+            return True
+    return False
+
+
+async def _booking_candidate_staff(start: datetime, preferred_role: str = "") -> list:
+    settings = await get_appointment_settings()
+    duration = int(settings.get("demo_duration_minutes") or settings.get("duration_minutes") or 30)
+    end = start + timedelta(minutes=duration)
+    calendar_settings = await _calendar_settings()
+    staff = [
+        s for s in await get_appointment_staff(include_inactive=False)
+        if _staff_available_for(s, start, settings.get("timezone") or DEFAULT_TIMEZONE)
+    ]
+    available = []
+    for person in staff:
+        if await _appointment_conflicts(person["id"], start, settings):
+            continue
+        busy = await _google_calendar_busy(person, start, end, calendar_settings)
+        if busy is True:
+            continue
+        if busy is None and calendar_settings.get("enabled") and person.get("google_calendar_connected") and not calendar_settings.get("fallback_internal"):
+            continue
+        available.append(person)
+    role = str(preferred_role or settings.get("default_staff_role") or "").strip().lower()
+    if role:
+        role_matches = [s for s in available if str(s.get("role") or "").strip().lower() == role]
+        if available and not role_matches:
+            await log_error(
+                "appointments", "appointment_staff_role_mismatch",
+                f"configured_role={role}; active_available_count={len(available)}; matching_count=0",
+                "warning",
+            )
+        return role_matches
+    return available
+
+
+async def _select_staff_round_robin(start: datetime, preferred_role: str = "") -> Optional[dict]:
+    candidates = await _booking_candidate_staff(start, preferred_role=preferred_role)
+    if not candidates:
+        return None
+    candidates = sorted(candidates, key=lambda s: (int(s.get("round_robin_order") or 0), s.get("created_at") or ""))
+    last_id = await get_setting("APPOINTMENT_LAST_STAFF_ID", "")
+    if last_id:
+        ids = [s["id"] for s in candidates]
+        if last_id in ids:
+            return candidates[(ids.index(last_id) + 1) % len(candidates)]
+    return candidates[0]
+
+
+_DUPLICATE_ALLOWED_STATUSES = {"cancelled", "lost", "no_show"}
+
+
+async def get_existing_active_appointment(phone: str, date: str, time: str) -> Optional[dict]:
+    """Return an existing active appointment for the same phone/date/time.
+
+    Soft business rule: cancelled/lost/no_show slots may be recreated; anything else
+    prevents duplicate appointment creation and staff reassignment.
+    """
+    phone_clean = ""
+    try:
+        phone_clean = normalize_phone(phone)
+    except Exception:
+        phone_clean = (phone or "").strip()
+    if not (phone_clean and date and time):
+        return None
+    rows = []
+    for candidate_phone in [phone_clean, (phone or "").strip()]:
+        if not candidate_phone:
+            continue
+        try:
+            rows.extend(await get_repository().list_appointments_by_phone(
+                candidate_phone,
+                date=date,
+                time=time[:5],
+            ))
+        except Exception as exc:
+            logger.warning("get_existing_active_appointment failed: %s", exc)
+    seen = set()
+    for row in rows:
+        row_id = row.get("id")
+        if row_id in seen:
+            continue
+        seen.add(row_id)
+        status = str(row.get("status") or "booked").strip().lower()
+        if status not in _DUPLICATE_ALLOWED_STATUSES:
+            return row
+    return None
+
+
+async def insert_appointment(name: str, phone: str, date: str, time: str, service: str, details: Optional[dict] = None) -> str:
+    settings = await get_appointment_settings()
+    try:
+        start = datetime.strptime(f"{date} {time[:5]}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        raise ValueError("Invalid appointment date or time")
+    now = _appointment_now_local(settings)
+    if start < now + timedelta(minutes=settings["minimum_notice_minutes"]):
+        raise ValueError("Appointment is too soon")
+    if start.date() > (now + timedelta(days=settings["max_booking_days_ahead"])).date():
+        raise ValueError("Appointment is too far ahead")
+    existing = await get_existing_active_appointment(phone, date, time)
+    if existing:
+        await log_error(
+            "appointments",
+            "appointment_duplicate_prevented",
+            f"phone={phone}; date={date}; time={time[:5]}; existing_id={existing.get('id')}; staff_id={existing.get('staff_id') or ''}",
+            "warning",
+        )
+        await update_lead_journey(phone, crm_stage_updates("demo_booked"))
+        return str(existing.get("id") or "")[:8].upper()
+    staff = None
+    if details and details.get("staff_id"):
+        candidate = await get_repository().get_appointment_staff(details["staff_id"])
+        if candidate and candidate.get("active", True):
+            candidate["working_days"] = _staff_days(candidate)
+            if _staff_available_for(candidate, start, settings.get("timezone") or DEFAULT_TIMEZONE):
+                if not await _appointment_conflicts(candidate["id"], start, settings):
+                    staff = candidate
+                else:
+                    raise ValueError(f"{candidate.get('name', 'Doctor/Staff')} already has an appointment at this time")
+            else:
+                raise ValueError(f"{candidate.get('name', 'Doctor/Staff')} is not available on this day/time")
+        elif candidate and not candidate.get("active", True):
+            raise ValueError(f"{candidate.get('name', 'Doctor/Staff')} is currently inactive / on leave")
+    if not staff:
+        staff = await _select_staff_round_robin(start, preferred_role=settings.get("default_staff_role") or "")
+    if not staff and await get_appointment_staff(include_inactive=True):
+        raise ValueError("No staff available for this slot")
+    if not staff and not await check_slot(date, time):
+        raise ValueError("Slot is unavailable")
+    full_id = str(uuid.uuid4())
+    row = {
+        "id": full_id,
+        "name": name,
+        "phone": phone,
+        "date": date,
+        "time": time[:5],
+        "service": service or settings.get("default_service_type") or settings.get("appointment_name") or "Appointment",
+        "status": "booked",
+        "staff_id": (staff or {}).get("id", ""),
+        "staff_name": (staff or {}).get("name", ""),
+        "duration_minutes": settings["demo_duration_minutes"],
+        "buffer_minutes": settings["buffer_minutes"],
+        "timezone": settings["timezone"],
+        "created_at": datetime.now().isoformat(),
+    }
+    details = details or {}
+    for key in (
+        "service_address", "location_latitude", "location_longitude",
+        "location_name", "location_url", "intake_data",
+    ):
+        if details.get(key) not in (None, "", {}):
+            row[key] = details[key]
+    try:
+        await get_repository().create_appointment(row)
+    except Exception:
+        fallback = {k: row[k] for k in ("id", "name", "phone", "date", "time", "service", "status", "created_at")}
+        await get_repository().create_appointment(fallback)
+    if staff:
+        calendar_result = await _create_google_calendar_event(staff, row, start, settings)
+        calendar_updates = {
+            key: value for key, value in (calendar_result or {}).items()
+            if key in {"calendar_event_id", "meet_link", "google_meet_link"} and value
+        }
+        if calendar_updates:
+            try:
+                await get_repository().update_appointment(full_id, {**calendar_updates, "last_calendar_sync_at": datetime.now().isoformat(), "calendar_sync_error": ""})
+            except Exception as exc:
+                await log_error("calendar", "google_calendar_event_update_failed", f"appointment_id={full_id}; error={str(exc)[:500]}", "warning")
+        elif (calendar_result or {}).get("error"):
+            try:
+                await get_repository().update_appointment(full_id, {"calendar_sync_error": str(calendar_result.get("error") or "")[:500], "last_calendar_sync_at": datetime.now().isoformat()})
+            except Exception:
+                pass
+    if staff:
+        await set_setting("APPOINTMENT_LAST_STAFF_ID", staff["id"])
+    await update_lead_journey(phone, crm_stage_updates("demo_booked"))
+    return full_id[:8].upper()
+
+
+async def check_slot(date: str, time: str) -> bool:
+    return bool((await get_slot_availability(date, time)).get("available"))
+
+
+async def get_slot_availability(date: str, time: str) -> dict:
+    """Return availability with an honest, customer-safe reason.
+
+    A boolean alone previously caused every rejection to be described as an
+    appointment conflict, even when the time was past or outside staff hours.
+    """
+    settings = await get_appointment_settings()
+    try:
+        start = datetime.strptime(f"{date} {time[:5]}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return {"available": False, "reason": "invalid_datetime", "conflict": False}
+    now = _appointment_now_local(settings)
+    if start < now + timedelta(minutes=settings["minimum_notice_minutes"]):
+        return {"available": False, "reason": "past_or_too_soon", "conflict": False}
+    if start.date() > (now + timedelta(days=settings["max_booking_days_ahead"])).date():
+        return {"available": False, "reason": "too_far_ahead", "conflict": False}
+    all_staff = await get_appointment_staff(include_inactive=True)
+    if all_staff:
+        active_staff = [person for person in all_staff if person.get("active", True)]
+        if not active_staff:
+            return {"available": False, "reason": "no_active_staff", "conflict": False}
+        scheduled_staff = [
+            person for person in active_staff
+            if _staff_available_for(person, start, settings.get("timezone") or DEFAULT_TIMEZONE)
+        ]
+        if not scheduled_staff:
+            return {"available": False, "reason": "outside_staff_hours", "conflict": False}
+        role = str(settings.get("default_staff_role") or "").strip().lower()
+        role_staff = [person for person in scheduled_staff if not role or str(person.get("role") or "").strip().lower() == role]
+        if not role_staff:
+            await log_error(
+                "appointments", "appointment_staff_role_mismatch",
+                f"configured_role={role}; active_count={len(active_staff)}; scheduled_count={len(scheduled_staff)}; matching_count=0",
+                "warning",
+            )
+            return {"available": False, "reason": "no_matching_staff_role", "conflict": False}
+        duration = int(settings.get("demo_duration_minutes") or settings.get("duration_minutes") or 30)
+        end = start + timedelta(minutes=duration)
+        calendar_settings = await _calendar_settings()
+        available = []
+        calendar_blocked = 0
+        calendar_unavailable = 0
+        for person in role_staff:
+            if await _appointment_conflicts(person["id"], start, settings):
+                continue
+            busy = await _google_calendar_busy(person, start, end, calendar_settings)
+            if busy is True:
+                calendar_blocked += 1
+                continue
+            if busy is None and calendar_settings.get("enabled") and person.get("google_calendar_connected") and not calendar_settings.get("fallback_internal"):
+                calendar_unavailable += 1
+                continue
+            available.append(person)
+        if available:
+            return {"available": True, "reason": "available", "conflict": False, "staff_count": len(available), "staff": available[0]}
+        if calendar_blocked:
+            return {"available": False, "reason": "calendar_conflict", "conflict": True}
+        if calendar_unavailable:
+            return {"available": False, "reason": "calendar_unavailable", "conflict": False}
+        return {"available": False, "reason": "appointment_conflict", "conflict": True}
+    rows = await get_repository().get_appointments_for_slot(date, time[:5])
+    conflict = bool(rows)
+    return {"available": not conflict, "reason": "appointment_conflict" if conflict else "available", "conflict": conflict}
+
+
+async def get_next_available(date: str, time: str) -> str:
+    settings = await get_appointment_settings()
+    try:
+        dt = datetime.strptime(f"{date} {time[:5]}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        dt = _appointment_now_local(settings).replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+    interval = max(settings["slot_interval_minutes"], 5)
+    for _ in range((settings["max_booking_days_ahead"] + 1) * 24 * 12):
+        dt += timedelta(minutes=interval)
+        if await check_slot(dt.strftime("%Y-%m-%d"), dt.strftime("%H:%M")):
+            return f"{dt.strftime('%Y-%m-%d')} at {dt.strftime('%H:%M')}"
+    return f"no open slots found in the next {settings['max_booking_days_ahead']} days"
+
+
+async def get_day_available_slots(date: str, staff_id: Optional[str] = None) -> list[dict]:
+    """Generate daily time slots and their real-time availability for any industry/staff."""
+    settings = await get_appointment_settings()
+    duration = int(settings.get("demo_duration_minutes") or settings.get("duration_minutes") or 30)
+    buffer = int(settings.get("buffer_minutes") or 10)
+    interval = int(settings.get("slot_interval_minutes") or (duration + buffer))
+    if interval <= 0:
+        interval = 30
+
+    start_h, end_h = 9, 18
+    target_person = None
+    if staff_id:
+        target_person = await get_repository().get_appointment_staff(staff_id)
+        if target_person and target_person.get("start_time") and target_person.get("end_time"):
+            try:
+                start_h = int(target_person["start_time"].split(":")[0])
+                end_h = int(target_person["end_time"].split(":")[0])
+            except Exception:
+                pass
+
+    try:
+        curr = datetime.strptime(f"{date.strip()} {start_h:02d}:00", "%Y-%m-%d %H:%M")
+        end_dt = datetime.strptime(f"{date.strip()} {end_h:02d}:00", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return []
+
+    slots = []
+    while curr < end_dt:
+        time_str = curr.strftime("%H:%M")
+        avail = True
+        reason = "available"
+        if target_person:
+            if not target_person.get("active", True):
+                avail = False
+                reason = "staff_inactive"
+            else:
+                target_person["working_days"] = _staff_days(target_person)
+                in_hours = _staff_available_for(target_person, curr, settings.get("timezone") or DEFAULT_TIMEZONE)
+                if not in_hours:
+                    avail = False
+                    reason = "outside_hours"
+                elif await _appointment_conflicts(target_person["id"], curr, settings):
+                    avail = False
+                    reason = "booked"
+        else:
+            slot_res = await get_slot_availability(date, time_str)
+            avail = bool(slot_res.get("available"))
+            reason = slot_res.get("reason", "available")
+
+        slots.append({
+            "time": time_str,
+            "display": curr.strftime("%I:%M %p"),
+            "available": avail,
+            "reason": reason,
+        })
+        curr += timedelta(minutes=interval)
+
+    return slots
+
+
+async def get_all_appointments(
+    date_filter: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    search_query: Optional[str] = None,
+    staff_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+) -> list:
+    status_groups = {
+        "active": ["pending", "confirmed", "booked", "in_progress"],
+        "pending_work": ["confirmed", "booked", "in_progress"],
+        "closed": ["completed", "cancelled", "no_show", "rescheduled"],
+    }
+    statuses = status_groups.get(str(status_filter or "").strip().lower())
+    if not statuses and status_filter:
+        statuses = [s.strip() for s in str(status_filter).split(",") if s.strip()]
+    rows = await get_repository().list_appointments(
+        date=date_filter or "",
+        statuses=statuses,
+        staff_id=staff_id or "",
+        date_from=date_from or "",
+        date_to=date_to or "",
+    )
+
+    if search_query:
+        sq = search_query.lower()
+        rows = [r for r in rows if sq in (r.get("name") or "").lower() or sq in (r.get("phone") or "").lower()]
+
+    return rows
+
+
+async def get_appointment_by_id(appointment_id: str) -> Optional[dict]:
+    appointment_id = (appointment_id or "").strip()
+    if not appointment_id:
+        return None
+    try:
+        return await get_repository().get_appointment(appointment_id, allow_prefix=True)
+    except Exception:
+        return None
+
+
+async def update_appointment_status(appointment_id: str, status: str) -> bool:
+    if status not in ("pending", "confirmed", "booked", "in_progress", "completed", "no_show", "cancelled", "rescheduled"):
+        return False
+
+    updates = {"status": status}
+    now_iso = datetime.now().isoformat()
+
+    if status == "in_progress":
+        updates["service_started_at"] = now_iso
+    elif status == "completed":
+        updates["completed_at"] = now_iso
+    elif status == "no_show":
+        updates["no_show_at"] = now_iso
+    elif status == "cancelled":
+        updates["cancelled_at"] = now_iso
+    elif status == "rescheduled":
+        updates["rescheduled_at"] = now_iso
+
+    if status in ("completed", "no_show", "cancelled", "rescheduled"):
+        updates["reminder_processed"] = True
+
+    appointment = await get_appointment_by_id(appointment_id)
+    try:
+        ok = await get_repository().update_appointment(appointment_id, updates)
+    except Exception:
+        # A rolling deploy may briefly run before the optional workflow columns
+        # are migrated. Preserve the status update without losing the action.
+        fallback = {"status": status}
+        if status == "completed":
+            fallback["completed_at"] = now_iso
+        elif status == "no_show":
+            fallback["no_show_at"] = now_iso
+        elif status == "cancelled":
+            fallback["cancelled_at"] = now_iso
+        elif status == "rescheduled":
+            fallback["rescheduled_at"] = now_iso
+        ok = await get_repository().update_appointment(appointment_id, fallback)
+    if ok and status == "completed" and appointment:
+        await update_lead_journey(appointment.get("phone") or appointment.get("phone_number") or "", crm_stage_updates("demo_done"))
+    return ok
+
+
+async def update_appointment_notes(appointment_id: str, notes: str) -> bool:
+    return await get_repository().update_appointment(appointment_id, {"notes": notes})
+
+
+async def update_appointment_service_fields(appointment_id: str, updates: dict) -> bool:
+    allowed = {
+        "status", "notes", "service_address", "location_latitude",
+        "location_longitude", "location_name", "location_url", "intake_data",
+        "staff_notification_message_id", "staff_notification_sent_at",
+        "service_started_at", "completed_at", "staff_status_updated_at",
+        "staff_status_updated_by", "reminder_processed",
+    }
+    clean = {key: value for key, value in (updates or {}).items() if key in allowed}
+    if not clean:
+        return False
+    try:
+        return await get_repository().update_appointment(appointment_id, clean)
+    except Exception:
+        legacy = {key: value for key, value in clean.items() if key in {"status", "notes", "completed_at", "reminder_processed"}}
+        if not legacy:
+            return False
+        return await get_repository().update_appointment(appointment_id, legacy)
+
+
+async def reschedule_appointment(appointment_id: str, new_date: str, new_time: str) -> dict:
+    repository = get_repository()
+    old_data = await repository.get_appointment(appointment_id, allow_prefix=False)
+    if not old_data:
+        raise ValueError("Appointment not found")
+    settings = await get_appointment_settings()
+
+    try:
+        start = datetime.strptime(f"{new_date} {new_time[:5]}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        raise ValueError("Invalid appointment date or time")
+
+    now = _appointment_now_local(settings)
+    if start < now + timedelta(minutes=settings["minimum_notice_minutes"]):
+        raise ValueError("Appointment is too soon")
+    if start.date() > (now + timedelta(days=settings["max_booking_days_ahead"])).date():
+        raise ValueError("Appointment is too far ahead")
+    existing = await get_existing_active_appointment(old_data.get("phone", ""), new_date, new_time)
+    if existing and existing.get("id") != appointment_id:
+        await log_error(
+            "appointments",
+            "appointment_duplicate_prevented",
+            f"phone={old_data.get('phone','')}; date={new_date}; time={new_time[:5]}; existing_id={existing.get('id')}; reschedule_from={appointment_id}",
+            "warning",
+        )
+        raise ValueError("An active appointment already exists for this phone and slot")
+
+    old_staff_id = old_data.get("staff_id")
+    staff_to_assign = None
+
+    if old_staff_id:
+        old_staff_obj = await repository.get_appointment_staff(old_staff_id)
+        if old_staff_obj:
+            if _staff_available_for(
+                old_staff_obj, start, settings.get("timezone") or DEFAULT_TIMEZONE
+            ) and not await _appointment_conflicts(old_staff_id, start, settings):
+                staff_to_assign = old_staff_obj
+
+    if not staff_to_assign:
+        staff_to_assign = await _select_staff_round_robin(start)
+
+    if not staff_to_assign and await get_appointment_staff(include_inactive=True):
+        raise ValueError("No staff available for this slot")
+
+    if not staff_to_assign and not await check_slot(new_date, new_time):
+        raise ValueError("Slot is unavailable")
+
+    new_id = str(uuid.uuid4())
+    new_row = {
+        "id": new_id,
+        "name": old_data.get("name", ""),
+        "phone": old_data.get("phone", ""),
+        "date": new_date,
+        "time": new_time[:5],
+        "service": old_data.get("service", ""),
+        "status": "booked",
+        "staff_id": (staff_to_assign or {}).get("id", ""),
+        "staff_name": (staff_to_assign or {}).get("name", ""),
+        "duration_minutes": old_data.get("duration_minutes") or settings["demo_duration_minutes"],
+        "buffer_minutes": old_data.get("buffer_minutes") or settings["buffer_minutes"],
+        "timezone": old_data.get("timezone") or settings["timezone"],
+        "created_at": datetime.now().isoformat(),
+        "rescheduled_from": appointment_id,
+        "notes": old_data.get("notes", ""),
+        "service_address": old_data.get("service_address", ""),
+        "location_latitude": old_data.get("location_latitude"),
+        "location_longitude": old_data.get("location_longitude"),
+        "location_name": old_data.get("location_name", ""),
+        "location_url": old_data.get("location_url", ""),
+        "intake_data": old_data.get("intake_data") or {},
+        "customer_reminder_sent": False,
+        "staff_reminder_sent": False,
+        "telegram_reminder_sent": False,
+        "reminder_processed": False,
+        "reminder_error": "",
+    }
+
+    new_row = await repository.reschedule_appointment_record(appointment_id, new_row)
+
+    if staff_to_assign:
+        await set_setting("APPOINTMENT_LAST_STAFF_ID", staff_to_assign["id"])
+
+    return new_row
+
+
+async def cancel_appointment(appointment_id: str) -> bool:
+    return await update_appointment_status(appointment_id, "cancelled")
+
+
+async def get_appointments_by_phone(phone: str) -> list:
+    candidates = []
+    try:
+        candidates.append(normalize_phone(phone))
+    except Exception:
+        pass
+    raw = str(phone or "").strip()
+    if raw and raw not in candidates:
+        candidates.append(raw)
+    rows = []
+    seen = set()
+    for candidate in candidates:
+        for row in await get_repository().list_appointments_by_phone(candidate):
+            key = row.get("id") or (row.get("phone"), row.get("date"), row.get("time"))
+            if key not in seen:
+                seen.add(key)
+                rows.append(row)
+    return rows
+
+
+async def get_next_active_appointment(phone: str) -> Optional[dict]:
+    """Return the customer's nearest current/future booked appointment."""
+    settings = await get_appointment_settings()
+    now = _appointment_now_local(settings)
+    active = []
+    for row in await get_appointments_by_phone(phone):
+        if str(row.get("status") or "booked").strip().lower() != "booked":
+            continue
+        start = _appointment_start(row)
+        if start and start >= now:
+            active.append((start, row))
+    return min(active, key=lambda item: item[0])[1] if active else None
+
+
+async def update_appointment_notifications(appointment_id: str, updates: dict) -> bool:
+    allowed = {
+        "confirmation_sent",
+        "confirmation_sent_at",
+        "staff_notified",
+        "telegram_notified",
+        "notification_error",
+        "customer_reminder_sent",
+        "customer_reminder_sent_at",
+        "staff_reminder_sent",
+        "staff_reminder_sent_at",
+        "telegram_reminder_sent",
+        "telegram_reminder_sent_at",
+        "reminder_error",
+        "reminder_processed",
+        "reminder_processed_at",
+        "staff_notification_message_id",
+        "staff_notification_sent_at",
+    }
+    clean = {k: v for k, v in (updates or {}).items() if k in allowed}
+    if not clean:
+        return False
+    try:
+        return await get_repository().update_appointment(appointment_id, clean)
+    except Exception:
+        # Schema may be missing newer columns; retry with the legacy subset.
+        legacy_allowed = {
+            "confirmation_sent",
+            "confirmation_sent_at",
+            "staff_notified",
+            "telegram_notified",
+            "notification_error",
+        }
+        fallback = {k: v for k, v in clean.items() if k in legacy_allowed}
+        if not fallback:
+            return False
+        return await get_repository().update_appointment(appointment_id, fallback)
+
+
+async def update_appointment_demo_fields(appointment_id: str, updates: dict) -> bool:
+    allowed = {
+        "demo_status_requested",
+        "demo_status_requested_at",
+        "demo_status_request_count",
+        "demo_status_updated_by",
+        "demo_status_updated_at",
+        "demo_result",
+        "demo_result_notes",
+        "demo_status_reply_message_id",
+        "notes",
+        "status",
+        "completed_at",
+        "no_show_at",
+        "rescheduled_at",
+    }
+    clean = {k: v for k, v in (updates or {}).items() if k in allowed}
+    if not clean:
+        return False
+    try:
+        return await get_repository().update_appointment(appointment_id, clean)
+    except Exception as exc:
+        logger.warning("update_appointment_demo_fields error: %s", exc)
+        await log_error(
+            "appointments",
+            "appointment_demo_fields_update_failed",
+            f"appointment_id={appointment_id}; fields={sorted(clean.keys())}; error={str(exc)[:1000]}",
+            "error",
+        )
+        return False
+
+
+async def get_due_reminder_appointments(window_minutes: int) -> list:
+    """Return booked appointments within the next ``window_minutes`` whose
+    reminder flags are not yet all satisfied.
+
+    Skips cancelled / completed / no_show / past appointments."""
+    if window_minutes <= 0:
+        return []
+    settings = await get_appointment_settings()
+    now = _appointment_now_local(settings)
+    window_end = now + timedelta(minutes=window_minutes)
+    today = now.strftime("%Y-%m-%d")
+    end_date = window_end.strftime("%Y-%m-%d")
+    try:
+        rows = await get_repository().list_appointments(
+            statuses=["booked"],
+            date_from=today,
+            date_to=end_date,
+            ascending=True,
+        )
+    except Exception as exc:
+        logger.warning("get_due_reminder_appointments fetch failed: %s", exc)
+        return []
+    due = []
+    for row in rows:
+        start = _appointment_start(row)
+        if not start:
+            continue
+        if start > window_end:
+            continue
+        # If already processed by the reminder runner, skip.
+        if bool(row.get("reminder_processed")):
+            continue
+        due.append(row)
+    return due
+
+
+async def log_call(phone_number: str, lead_name: Optional[str], outcome: str, reason: str, duration_seconds: int, recording_url: Optional[str] = None, notes: Optional[str] = None, recording_object_key: Optional[str] = None, recording_size_bytes: int = 0) -> None:
+    row = {"id": str(uuid.uuid4()), "phone_number": phone_number, "lead_name": lead_name, "outcome": outcome, "reason": reason, "duration_seconds": duration_seconds, "timestamp": datetime.now().isoformat()}
+    if recording_url:
+        row["recording_url"] = recording_url
+        row["recording_deleted"] = False
+        row["recording_size_bytes"] = recording_size_bytes or 0
+    if recording_object_key:
+        row["recording_object_key"] = recording_object_key
+    if notes:
+        row["notes"] = notes
+    await get_repository().create_call_log(row)
+    await upsert_crm_contact_from_call(row)
+
+
+async def get_all_calls(page: int = 1, limit: int = 20) -> list:
+    offset = (page - 1) * limit
+    return await get_repository().list_call_logs(limit=limit, offset=offset)
+
+
+async def get_call_logs_for_export(filters: Optional[dict] = None) -> list:
+    filters = filters or {}
+    date_from = (filters.get("date_from") or "").strip()
+    date_to = (filters.get("date_to") or "").strip()
+    outcome = (filters.get("outcome") or "").strip()
+    phone = (filters.get("phone") or "").strip()
+
+    if date_to:
+        date_to = f"{date_to}T23:59:59.999999" if len(date_to) == 10 else date_to
+    return await get_repository().list_call_logs(phone=phone, outcome=outcome, date_from=date_from, date_to=date_to, limit=5000)
+
+
+async def get_recordings_for_cleanup(retention_days: int) -> list:
+    cutoff = (datetime.now() - timedelta(days=max(retention_days, 0))).isoformat()
+    return await get_repository().list_recordings_for_cleanup(cutoff)
+
+
+async def mark_recording_deleted(call_id: str) -> bool:
+    return await get_repository().update_call_log(call_id, {
+        "recording_deleted": True,
+        "recording_deleted_at": datetime.now().isoformat(),
+        "recording_url": None,
+    })
+
+
+async def get_recording_storage_stats() -> dict:
+    stats = await get_repository().get_recording_storage_stats()
+    total_size = int(stats.get("total_size_bytes") or 0)
+    return {
+        "total_recordings": int(stats.get("total_recordings") or 0),
+        "active_recordings": int(stats.get("active_recordings") or 0),
+        "deleted_recordings": int(stats.get("deleted_recordings") or 0),
+        "total_size_bytes": total_size,
+        "total_size_mb": round(total_size / (1024 * 1024), 2),
+        "total_size_gb": round(total_size / (1024 * 1024 * 1024), 2),
+        "size_tracking_note": "Recording size is only tracked for new recordings.",
+    }
+
+
+async def get_calls_by_phone(phone: str) -> list:
+    return await get_repository().list_call_logs(phone=phone, limit=5000)
+
+
+async def update_call_notes(call_id: str, notes: str) -> bool:
+    return await get_repository().update_call_log(call_id, {"notes": notes})
+
+
+async def get_contacts() -> list:
+    rows = await get_repository().list_call_logs(limit=5000)
+    contacts = {}
+    for row in rows:
+        phone = row["phone_number"]
+        contacts.setdefault(phone, {"phone_number": phone, "lead_name": row.get("lead_name"), "total_calls": 0, "booked": 0, "last_call": row["timestamp"], "last_outcome": row.get("outcome")})
+        contacts[phone]["total_calls"] += 1
+        if row.get("outcome") == "booked":
+            contacts[phone]["booked"] += 1
+    return sorted(contacts.values(), key=lambda c: c["last_call"], reverse=True)
+
+
+async def get_lead_statuses() -> list:
+    try:
+        repository = get_repository()
+        rows = await repository.list_lead_statuses()
+        if rows:
+            return rows
+        for name, color in DEFAULT_LEAD_STATUSES:
+            await repository.upsert_lead_status({"name": name, "color": color})
+        return await repository.list_lead_statuses()
+    except Exception as exc:
+        await log_error("server", "Lead statuses unavailable", str(exc), "warning")
+        return [{"id": name, "name": name, "color": color} for name, color in DEFAULT_LEAD_STATUSES]
+
+
+async def add_lead_status(name: str, color: Optional[str] = None) -> Optional[dict]:
+    row = {"name": name.strip(), "color": (color or "").strip() or None}
+    return await get_repository().upsert_lead_status(row)
+
+
+async def delete_lead_status(status_id: str) -> bool:
+    return await get_repository().delete_lead_status(status_id)
+
+
+async def delete_crm_tag(tag: str) -> bool:
+    return await get_repository().delete_crm_tag(tag.strip())
+
+
+async def apply_pipeline_preset(preset_key: str = "dental") -> list:
+    """Apply an industry pipeline preset (e.g. 'dental' or 'interior') to CRM statuses."""
+    key = (preset_key or "dental").strip().lower()
+    items = PIPELINE_PRESETS.get(key) or PIPELINE_PRESETS.get("dental", [])
+    repository = get_repository()
+    for item in items:
+        try:
+            await repository.upsert_lead_status({"name": item["name"], "color": item.get("color")})
+        except Exception:
+            pass
+    return await repository.list_lead_statuses()
+
+
+async def upsert_crm_contact_from_call(call_log: dict) -> None:
+    phone = call_log.get("phone_number")
+    if not phone:
+        return
+    try:
+        repository = get_repository()
+        current_row = await repository.get_crm_contact_by_phone(phone) or {}
+        total_calls = int(current_row.get("total_calls") or 0) + 1
+        row = {
+            "phone_number": phone,
+            "lead_name": call_log.get("lead_name"),
+            "last_call_outcome": call_log.get("outcome"),
+            "last_call_at": call_log.get("timestamp") or datetime.now().isoformat(),
+            "total_calls": total_calls,
+            "updated_at": datetime.now().isoformat(),
+        }
+        if not current_row:
+            row["crm_status"] = DEFAULT_CRM_STATUS
+        await repository.upsert_crm_contact(row)
+    except Exception as exc:
+        await log_error("server", "CRM contact upsert skipped", str(exc), "warning")
+
+
+def _crm_fallback_contact(row: dict) -> dict:
+    return {
+        "phone_number": row.get("phone_number"),
+        "lead_name": row.get("lead_name"),
+        "email": row.get("email"),
+        "city": row.get("city"),
+        "location": row.get("location"),
+        "address": row.get("address"),
+        "requirement": row.get("requirement"),
+        "budget": row.get("budget"),
+        "source": row.get("source"),
+        "business_name": row.get("business_name"),
+        "campaign_name": row.get("campaign_name"),
+        "service_type": row.get("service_type"),
+        "crm_status": row.get("crm_status") or DEFAULT_CRM_STATUS,
+        "custom_status": row.get("custom_status"),
+        "next_followup_at": row.get("next_followup_at"),
+        "assigned_to": row.get("assigned_to"),
+        "crm_notes": row.get("crm_notes"),
+        "last_call_outcome": row.get("last_call_outcome") or row.get("last_outcome"),
+        "last_call_at": row.get("last_call_at") or row.get("last_call"),
+        "total_calls": row.get("total_calls") or 0,
+        "journey_stage": row.get("journey_stage") or "new_lead",
+        "next_best_action": row.get("next_best_action") or "",
+        "next_action_at": row.get("next_action_at"),
+        "next_action_channel": row.get("next_action_channel") or "",
+        "last_customer_reply_at": row.get("last_customer_reply_at"),
+        "last_whatsapp_sent_at": row.get("last_whatsapp_sent_at"),
+        "last_call_attempt_at": row.get("last_call_attempt_at"),
+        "call_attempt_count": row.get("call_attempt_count") or 0,
+        "whatsapp_followup_count": row.get("whatsapp_followup_count") or 0,
+        "no_response_followup_count": row.get("no_response_followup_count") or 0,
+        "demo_reminder_count": row.get("demo_reminder_count") or 0,
+        "stop_automation": bool(row.get("stop_automation") or False),
+        "stop_automation_reason": row.get("stop_automation_reason") or "",
+        "last_followup_reason": row.get("last_followup_reason") or "",
+        "last_intent": row.get("last_intent") or "",
+        "preferred_channel": row.get("preferred_channel") or "",
+        "preferred_callback_at": row.get("preferred_callback_at"),
+        "created_at": row.get("created_at"),
+        "updated_at": row.get("updated_at"),
+        "tags_json": row.get("tags_json"),
+        "custom_fields_json": row.get("custom_fields_json"),
+    }
+
+
+# Lead statuses that are considered "active" (not yet closed/terminal).
+CRM_ACTIVE_STATUSES = {
+    "New", "Pending Call", "Contacted", "No Answer", "Busy",
+    "Interested", "Callback Requested", "Follow-up Scheduled",
+    "Appointment Booked", "Appointment Confirmed", "Visited",
+    "Quotation Sent", "Payment Pending",
+}
+# Statuses where no further outbound action is needed.
+CRM_TERMINAL_STATUSES = {
+    "Converted", "Lost", "Invalid Number", "Duplicate", "Not Interested",
+    "Wrong Number", "Do Not Contact",
+    "converted", "lost", "wrong_number", "do_not_contact", "not_interested",
+}
+# Statuses valid for inclusion in the "Due Today" bucket.
+CRM_DUE_TODAY_STATUSES = {
+    "New", "Pending Call", "Callback Requested", "Follow-up Scheduled",
+    "No Answer", "Busy", "Interested",
+}
+
+CRM_PIPELINE_STAGES = {
+    "new_lead", "contacted", "interested", "callback_requested",
+    "demo_booked", "demo_done", "converted", "not_interested", "lost",
+}
+CRM_PIPELINE_STAGE_ALIASES = {
+    "new": "new_lead",
+    "pending_call": "new_lead",
+    "hot_lead": "interested",
+    "quote_given": "interested",
+    "quotation_sent": "interested",
+    "details_requested": "interested",
+    "details_sent": "interested",
+    "demo_requested": "interested",
+    "appointment_booked": "demo_booked",
+    "booked": "demo_booked",
+    "completed": "demo_done",
+    "closed_won": "converted",
+    "closed_lost": "lost",
+    "wrong_number": "lost",
+    "invalid_number": "lost",
+    "do_not_contact": "lost",
+    "demo_no_show": "callback_requested",
+    "rescheduled": "callback_requested",
+    "demo_reschedule_requested": "callback_requested",
+    "reschedule_requested": "callback_requested",
+    "need_followup": "callback_requested",
+}
+CRM_PIPELINE_NEXT_ACTIONS = {
+    "callback_requested": "call_customer",
+    "demo_booked": "demo_reminder",
+    "demo_done": "post_demo_followup",
+    "converted": "",
+    "not_interested": "",
+    "lost": "",
+}
+CRM_PIPELINE_TERMINAL_STAGES = {"converted", "not_interested", "lost"}
+
+
+def canonical_crm_stage(stage: str, allow_custom: bool = True) -> Optional[str]:
+    slug = re.sub(r"[^a-z0-9]+", "_", (stage or "").strip().lower()).strip("_")
+    if not slug:
+        return None
+    if slug in CRM_PIPELINE_STAGES:
+        return slug
+    aliased = CRM_PIPELINE_STAGE_ALIASES.get(slug)
+    if aliased:
+        return aliased
+    return slug if allow_custom else None
+
+
+def crm_stage_updates(stage: str) -> dict:
+    canonical = canonical_crm_stage(stage, allow_custom=True)
+    if not canonical:
+        raise ValueError(f"Unsupported CRM pipeline stage: {stage}")
+    updates = {"crm_status": canonical, "journey_stage": canonical, "status": canonical}
+    if canonical in CRM_PIPELINE_NEXT_ACTIONS:
+        updates["next_best_action"] = CRM_PIPELINE_NEXT_ACTIONS[canonical]
+    if canonical in CRM_PIPELINE_TERMINAL_STAGES:
+        updates["stop_automation"] = True
+    return updates
+
+
+
+def _tz_today(timezone_name: Optional[str] = None) -> str:
+    """Return today's date as YYYY-MM-DD in the given IANA timezone (or local)."""
+    tz_name = (timezone_name or DEFAULT_TIMEZONE).strip()
+    try:
+        from zoneinfo import ZoneInfo  # Python 3.9+
+        from datetime import timezone as _tz
+        now_tz = datetime.now(tz=ZoneInfo(tz_name))
+    except Exception:
+        # Fallback: use UTC offset heuristic for Asia/Kolkata (+05:30)
+        try:
+            offsets = {"Asia/Singapore": 480, "Asia/Kolkata": 330, "UTC": 0, "Asia/Dhaka": 360,
+                       "America/New_York": -300, "America/Los_Angeles": -480,
+                       "Europe/London": 0, "Asia/Dubai": 240}
+            offset_min = offsets.get(tz_name, 330)
+            from datetime import timezone as _tz, timedelta as _td
+            now_tz = datetime.now(tz=_tz(offset=_td(minutes=offset_min)))
+        except Exception:
+            now_tz = datetime.now()
+    return now_tz.date().isoformat()
+
+
+async def get_crm_contacts(
+    status: Optional[str] = None,
+    outcome: Optional[str] = None,
+    q: Optional[str] = None,
+    due_today: bool = False,
+    today: bool = False,
+    timezone: Optional[str] = None,
+    source: Optional[str] = None,
+    business_name: Optional[str] = None,
+    campaign_name: Optional[str] = None,
+    city: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    assigned_to: Optional[str] = None,
+    recording_available: Optional[bool] = None,
+    has_followup: Optional[bool] = None,
+    warnings: Optional[list] = None,
+) -> list:
+    rows = []
+    fetch_error = None
+    for attempt in range(2):
+        try:
+            rows = await get_repository().list_crm_contacts(status=status or "", outcome=outcome or "")
+            fetch_error = None
+            break
+        except Exception as exc:
+            fetch_error = exc
+            if attempt == 0:
+                await asyncio.sleep(0.15)
+
+    if fetch_error is not None:
+        warning = "crm_contacts_fetch_failed_fallback_used"
+        if warnings is not None and warning not in warnings:
+            warnings.append(warning)
+        await log_error("server", warning, f"CRM contacts unavailable after retry; using call logs fallback. error={str(fetch_error)[:300]}", "warning")
+
+    if not rows:
+        try:
+            rows = [_crm_fallback_contact(c) for c in await get_contacts()]
+        except Exception as exc:
+            if warnings is not None and "call_logs_fallback_fetch_failed" not in warnings:
+                warnings.append("call_logs_fallback_fetch_failed")
+            await log_error("server", "call_logs_fallback_fetch_failed", f"CRM contact fallback unavailable. error={str(exc)[:300]}", "warning")
+            rows = []
+    else:
+        rows = [_crm_fallback_contact(c) for c in rows]
+
+    needle = (q or "").strip().lower()
+    today_str = _tz_today(timezone)
+    filtered = []
+    for row in rows:
+        if needle and needle not in (row.get("phone_number") or "").lower() and needle not in (row.get("lead_name") or "").lower():
+            continue
+        if status and row.get("crm_status") != status:
+            continue
+        if outcome and row.get("last_call_outcome") != outcome:
+            continue
+        if due_today:
+            # Must have a next_followup_at that falls on today in the chosen timezone.
+            fup = (row.get("next_followup_at") or "")[:10]
+            if fup != today_str:
+                continue
+            # And the lead must not be in a terminal status.
+            row_status = row.get("crm_status") or DEFAULT_CRM_STATUS
+            if row_status in CRM_TERMINAL_STATUSES:
+                continue
+        if today:
+            created = (row.get("created_at") or "")[:10]
+            if created != today_str:
+                continue
+        if source and (row.get("source") or "") != source:
+            continue
+        if business_name and (row.get("business_name") or "") != business_name:
+            continue
+        if campaign_name and (row.get("campaign_name") or "") != campaign_name:
+            continue
+        if city and (row.get("city") or "") != city:
+            continue
+        if assigned_to and (row.get("assigned_to") or "") != assigned_to:
+            continue
+        created = row.get("created_at") or ""
+        if date_from and created < date_from:
+            continue
+        if date_to and created[:10] > date_to:
+            continue
+        if has_followup is True and not row.get("next_followup_at"):
+            continue
+        if has_followup is False and row.get("next_followup_at"):
+            continue
+        if recording_available is not None:
+            calls = await get_calls_by_phone(row.get("phone_number") or "")
+            has_recording = any(c.get("recording_url") and not c.get("recording_deleted") for c in calls)
+            if recording_available != has_recording:
+                continue
+        filtered.append(row)
+    return filtered
+
+
+async def upsert_crm_lead(
+    lead: dict,
+    import_source: Optional[str] = None,
+    upload_batch_id: Optional[str] = None,
+    *,
+    forbid_duplicate: bool = False,
+) -> dict:
+    """Insert or merge a CRM lead, treating the normalized phone number as the
+    unique identity.
+
+    - ``forbid_duplicate=True``: if a contact already exists for this phone, raise
+      :class:`DuplicateContactError` instead of merging. This is what the manual
+      *Add Lead* UI uses so the operator gets HTTP 409 + a clear error message.
+    - ``forbid_duplicate=False`` (default, used by CSV upload / inbound flows):
+      merge into the existing record, append a *re-enquiry* audit line to
+      ``crm_notes``, and return ``{"status": "duplicate"}`` so the caller can
+      report ``duplicate_count`` separately from ``imported_count``.
+    """
+    phone = normalize_phone(lead.get("phone_number") or lead.get("phone") or "")
+    lead_name = _clean_value(lead.get("lead_name") or lead.get("name"))
+    if not lead_name:
+        raise ValueError("lead_name is required")
+    now = datetime.now().isoformat()
+    try:
+        existing_row = await get_repository().get_crm_contact_by_phone(phone)
+    except Exception as exc:
+        logger.warning("upsert_crm_lead: lookup failed for %s: %s", phone, exc)
+        existing_row = None
+
+    if existing_row and forbid_duplicate:
+        # Manual Add-Lead path: do NOT silently merge. Surface as 409 so the UI
+        # can prompt the user to open & edit the existing lead instead.
+        raise DuplicateContactError(phone, existing_row)
+
+    incoming = {}
+    for field in CRM_LEAD_FIELDS:
+        if field == "phone_number":
+            incoming[field] = phone
+            continue
+        value = _clean_value(lead.get(field))
+        if value is not None:
+            incoming[field] = value
+    incoming.setdefault("lead_name", lead_name)
+    incoming["source"] = canonical_lead_source(incoming.get("source") or import_source or DEFAULT_CRM_SOURCE)
+    incoming.setdefault("lead_country", DEFAULT_COUNTRY)
+    incoming.setdefault("lead_country_code", DEFAULT_COUNTRY_CODE)
+    if import_source:
+        incoming["import_source"] = import_source
+    if upload_batch_id:
+        incoming["upload_batch_id"] = upload_batch_id
+    incoming["last_synced_at"] = now
+    incoming["updated_at"] = now
+
+    if existing_row:
+        existing = existing_row
+        updates = {"updated_at": now, "last_synced_at": now}
+        fill_if_blank = [
+            "lead_name", "email", "city", "location", "address", "requirement", "budget", "source",
+            "business_name", "campaign_name", "service_type", "lead_country",
+            "lead_country_code", "custom_status",
+            "assigned_to", "upload_batch_id", "import_source",
+            # NOTE: next_followup_at is NOT in fill_if_blank; we always reset it
+            # to today on re-enquiry (see below) so the lead re-enters Due Today.
+        ]
+        for field in fill_if_blank:
+            if incoming.get(field) and not existing.get(field):
+                updates[field] = incoming[field]
+
+        # Always reset next_followup_at to today on any re-enquiry/duplicate so
+        # the lead immediately surfaces in the Due Today bucket.
+        today_str = _tz_today()
+        _start_time = (os.environ.get("OUTBOUND_START_TIME") or "10:00").strip()
+        if incoming.get("next_followup_at"):
+            # Caller supplied an explicit follow-up date — use it.
+            updates["next_followup_at"] = incoming["next_followup_at"]
+        else:
+            # No explicit date → reset to today at outbound start time so lead
+            # is Due Today and callable as soon as the window opens.
+            updates["next_followup_at"] = f"{today_str}T{_start_time}:00"
+
+        # Re-enquiry: update status to actionable unless currently terminal/converted.
+        existing_status = (existing.get("crm_status") or DEFAULT_CRM_STATUS)
+        if existing_status not in CRM_TERMINAL_STATUSES:
+            new_status = incoming.get("crm_status") or "Callback Requested"
+            updates["crm_status"] = new_status
+        elif incoming.get("crm_status") and incoming["crm_status"] not in CRM_TERMINAL_STATUSES:
+            updates["crm_status"] = incoming["crm_status"]
+        # else: keep existing terminal status unchanged.
+
+        # Build merged notes: explicit incoming note + re-enquiry audit line.
+        existing_notes = existing.get("crm_notes") or ""
+        merged_notes = existing_notes
+        stamp_minute = datetime.now().strftime("%Y-%m-%d %H:%M")
+        stamp_day = datetime.now().strftime("%Y-%m-%d")
+        if incoming.get("crm_notes"):
+            line = f"[{stamp_minute}] {incoming['crm_notes']}"
+            merged_notes = f"{merged_notes}\n{line}" if merged_notes else line
+        # Re-enquiry / duplicate audit line: only when this upsert came from an
+        # automated source (CSV upload, inbound call, etc.) — not when an
+        # operator is just editing an existing record.
+        auto_sources = {"file_upload", "api", "inbound", "outbound", "call"}
+        if import_source and import_source in auto_sources:
+            src_label = incoming.get("source") or import_source
+            audit = f"[{stamp_day}] Re-enquiry received from {src_label}"
+            # Don't spam if the exact same audit line was added earlier today.
+            if audit not in merged_notes:
+                merged_notes = f"{merged_notes}\n{audit}" if merged_notes else audit
+        if merged_notes != existing_notes:
+            updates["crm_notes"] = merged_notes
+
+        await get_repository().update_crm_contact(phone, updates)
+        return {"status": "duplicate", "phone_number": phone}
+
+    # Fresh insert — default followup to today at outbound start time + default status.
+    incoming.setdefault("crm_status", DEFAULT_CRM_STATUS)
+    incoming.setdefault("journey_stage", "new_lead")
+    if not incoming.get("next_followup_at"):
+        # Automatically Due Today and callable as soon as the calling window opens.
+        today_str = _tz_today()
+        _start_time = (os.environ.get("OUTBOUND_START_TIME") or "10:00").strip()
+        incoming["next_followup_at"] = f"{today_str}T{_start_time}:00"
+    incoming["created_at"] = now
+    await get_repository().upsert_crm_contact(incoming)
+    return {"status": "inserted", "phone_number": phone}
+
+
+async def update_crm_contact_full(phone: str, updates: dict) -> bool:
+    """Apply an explicit edit to an existing CRM lead (Edit Lead UI).
+
+    Unlike :func:`upsert_crm_lead`, this REPLACES the provided fields exactly
+    (no fill-if-blank semantics, no auto-append of notes) so the UI's Edit
+    dialog behaves predictably.
+    """
+    clean = normalize_phone(phone)
+    await _ensure_crm_contact(clean)
+    payload = {"updated_at": datetime.now().isoformat()}
+    editable = set(CRM_LEAD_FIELDS) - {"phone_number", "upload_batch_id", "import_source", "last_synced_at"}
+    for key, value in (updates or {}).items():
+        if key in editable:
+            payload[key] = _clean_value(value)
+    try:
+        return await get_repository().update_crm_contact(clean, payload)
+    except Exception as exc:
+        logger.warning("update_crm_contact_full: update failed for %s: %s", clean, exc)
+        return False
+
+
+async def _ensure_crm_contact(phone: str) -> None:
+    phone = normalize_phone(phone)
+    try:
+        current = await get_repository().get_crm_contact_by_phone(phone)
+    except Exception as exc:
+        logger.warning("_ensure_crm_contact: lookup failed for %s: %s", phone, exc)
+        current = None
+    if current:
+        return
+    try:
+        calls = await get_repository().list_call_logs(phone=phone, limit=5000)
+    except Exception as exc:
+        logger.warning("_ensure_crm_contact: call_logs lookup failed for %s: %s", phone, exc)
+        calls = []
+    row = {
+        "phone_number": phone,
+        "crm_status": DEFAULT_CRM_STATUS,
+        "journey_stage": "new_lead",
+        "source": "Voice Call",
+        "lead_country": DEFAULT_COUNTRY,
+        "lead_country_code": DEFAULT_COUNTRY_CODE,
+        "updated_at": datetime.now().isoformat(),
+    }
+    if calls:
+        row.update({
+            "lead_name": calls[0].get("lead_name"),
+            "last_call_outcome": calls[0].get("outcome"),
+            "last_call_at": calls[0].get("timestamp"),
+            "total_calls": len(calls),
+        })
+    await get_repository().upsert_crm_contact(row)
+
+
+async def update_crm_contact_status(phone: str, crm_status: str, custom_status: Optional[str] = None) -> bool:
+    phone = normalize_phone(phone)
+    await _ensure_crm_contact(phone)
+    try:
+        return await get_repository().update_crm_contact(phone, {
+            "crm_status": crm_status,
+            "custom_status": custom_status,
+            "updated_at": datetime.now().isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("update_crm_contact_status: failed for %s: %s", phone, exc)
+        return False
+
+
+async def update_crm_contact_followup(phone: str, next_followup_at: Optional[str]) -> bool:
+    phone = normalize_phone(phone)
+    await _ensure_crm_contact(phone)
+    try:
+        return await get_repository().update_crm_contact(phone, {
+            "next_followup_at": next_followup_at,
+            "updated_at": datetime.now().isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("update_crm_contact_followup: failed for %s: %s", phone, exc)
+        return False
+
+
+JOURNEY_FIELDS = {
+    "journey_stage", "next_best_action", "next_action_at", "next_action_channel",
+    "last_customer_reply_at", "last_whatsapp_sent_at", "last_call_attempt_at",
+    "call_attempt_count", "whatsapp_followup_count", "no_response_followup_count",
+    "demo_reminder_count", "stop_automation", "stop_automation_reason",
+    "last_followup_reason", "last_intent", "preferred_channel",
+    "preferred_callback_at", "crm_status", "next_followup_at",
+    "tags_json", "custom_fields_json", "handoff_required",
+    "handoff_reason", "handoff_assigned_to", "handoff_at",
+}
+
+
+async def update_lead_journey(phone: str, fields: dict) -> bool:
+    phone = normalize_phone(phone)
+    if not phone or not fields:
+        return False
+    await _ensure_crm_contact(phone)
+    requested_stage = fields.get("crm_status") or fields.get("journey_stage") or ""
+    canonical_stage = canonical_crm_stage(requested_stage)
+    normalized_fields = dict(fields or {})
+    if canonical_stage:
+        normalized_fields.update(crm_stage_updates(canonical_stage))
+    payload = {k: v for k, v in normalized_fields.items() if k in JOURNEY_FIELDS}
+    if not payload:
+        return False
+    payload["updated_at"] = datetime.now().isoformat()
+    try:
+        ok = await get_repository().update_crm_contact(phone, payload)
+        if ok and canonical_stage:
+            await log_error("crm", "crm_stage_auto_updated", f"phone={phone}; stage={canonical_stage}", "info")
+        return ok
+    except Exception as exc:
+        await log_error("followup", "lead_journey_update_skipped", f"phone={phone}; error={exc}", "warning")
+        ok_any = False
+        for key, value in payload.items():
+            if key == "updated_at":
+                continue
+            try:
+                ok_any = await get_repository().update_crm_contact(phone, {key: value, "updated_at": payload["updated_at"]}) or ok_any
+            except Exception as field_exc:
+                await log_error("followup", "lead_journey_field_update_skipped", f"phone={phone}; field={key}; error={field_exc}", "warning")
+        return ok_any
+
+
+async def create_followup_action(
+    phone: str,
+    event_type: str,
+    action_type: str,
+    channel: str,
+    scheduled_at,
+    reason: str = "",
+    payload: Optional[dict] = None,
+    priority: int = 5,
+    max_attempts: int = 3,
+    source: str = "",
+    source_id: str = "",
+) -> Optional[str]:
+    phone = normalize_phone(phone)
+    row = {
+        "id": str(uuid.uuid4()),
+        "phone_number": phone,
+        "event_type": event_type,
+        "action_type": action_type,
+        "channel": channel,
+        "scheduled_at": scheduled_at.isoformat() if hasattr(scheduled_at, "isoformat") else str(scheduled_at),
+        "status": "scheduled",
+        "priority": priority,
+        "source": source or "",
+        "source_id": source_id or "",
+        "reason": reason or "",
+        "payload": payload or {},
+        "result": {},
+        "attempt_number": 0,
+        "max_attempts": max_attempts,
+        "created_at": datetime.now().isoformat(),
+        "updated_at": datetime.now().isoformat(),
+    }
+    try:
+        created = await get_repository().create_followup_action(row)
+        action_id = created.get("id") or row["id"]
+        await log_error("followup", "followup_action_created", f"id={action_id}; phone={phone}; event_type={event_type}; action_type={action_type}; channel={channel}; scheduled_at={row['scheduled_at']}; reason={reason}", "info")
+        return action_id
+    except Exception as exc:
+        await log_error("followup", "followup_action_create_failed", f"phone={phone}; error={exc}", "warning")
+        return None
+
+
+async def get_due_followup_actions(limit: int = 50) -> list:
+    try:
+        return await get_repository().list_followup_actions(
+            status="scheduled",
+            due_before=datetime.now().isoformat(),
+            limit=limit,
+            ascending=True,
+        )
+    except Exception as exc:
+        await log_error("followup", "followup_due_fetch_failed", str(exc), "warning")
+        return []
+
+
+async def claim_due_followup_actions(limit: int = 50) -> list:
+    try:
+        return await get_repository().claim_followup_actions(datetime.now().isoformat(), limit=limit)
+    except Exception as exc:
+        await log_error("followup", "followup_claim_failed", str(exc), "warning")
+        return []
+
+
+async def get_followup_actions(phone: Optional[str] = None, status: Optional[str] = None, limit: int = 100) -> list:
+    try:
+        return await get_repository().list_followup_actions(
+            phone=normalize_phone(phone) if phone else "",
+            status=status or "",
+            limit=limit,
+        )
+    except Exception as exc:
+        await log_error("followup", "followup_actions_fetch_failed", str(exc), "warning")
+        return []
+
+
+async def update_followup_action_status(action_id: str, status: str, result: Optional[dict] = None, error_message: str = "") -> bool:
+    updates = {
+        "status": status,
+        "updated_at": datetime.now().isoformat(),
+        "result": result or {},
+        "error_message": error_message or "",
+    }
+    if status in {"completed", "skipped", "failed"}:
+        updates["completed_at"] = datetime.now().isoformat()
+    try:
+        return await get_repository().update_followup_action_status(
+            action_id,
+            status,
+            result=updates["result"],
+            error_message=updates["error_message"],
+        )
+    except Exception as exc:
+        await log_error("followup", "followup_action_status_update_failed", f"id={action_id}; error={exc}", "warning")
+        return False
+
+
+async def reschedule_followup_action(action_id: str, scheduled_at, reason: str = "") -> bool:
+    updates = {
+        "status": "scheduled",
+        "scheduled_at": scheduled_at.isoformat() if hasattr(scheduled_at, "isoformat") else str(scheduled_at),
+        "updated_at": datetime.now().isoformat(),
+        "error_message": reason or "",
+    }
+    try:
+        return await get_repository().reschedule_followup_action(
+            action_id,
+            updates["scheduled_at"],
+            reason=updates["error_message"],
+        )
+    except Exception as exc:
+        await log_error("followup", "followup_action_reschedule_failed", f"id={action_id}; error={exc}", "warning")
+        return False
+
+
+async def increment_lead_attempts(phone: str, channel: str) -> bool:
+    phone = normalize_phone(phone)
+    state = await get_lead_followup_state(phone) or {}
+    now = datetime.now().isoformat()
+    if (channel or "").lower() == "call":
+        updates = {
+            "call_attempt_count": int(state.get("call_attempt_count") or 0) + 1,
+            "last_call_attempt_at": now,
+        }
+    else:
+        updates = {
+        "whatsapp_followup_count": int(state.get("whatsapp_followup_count") or 0) + 1,
+        "last_whatsapp_sent_at": now,
+        }
+    current_stage = canonical_crm_stage(state.get("crm_status") or state.get("journey_stage") or "")
+    if current_stage in (None, "new_lead"):
+        updates.update(crm_stage_updates("contacted"))
+    return await update_lead_journey(phone, updates)
+
+
+async def mark_lead_stop_automation(phone: str, reason: str, status: str) -> bool:
+    await log_error("followup", f"automation_stopped_{reason}", f"phone={phone}; status={status}", "info")
+    return await update_lead_journey(phone, {
+        "stop_automation": True,
+        "stop_automation_reason": reason,
+        "journey_stage": status,
+        "crm_status": status,
+        "last_intent": reason,
+    })
+
+
+async def get_lead_followup_state(phone: str) -> Optional[dict]:
+    contact = await get_crm_contact_by_phone(phone)
+    return contact
+
+
+async def set_next_best_action(phone: str, action: str, channel: str, scheduled_at, reason: str = "") -> bool:
+    return await update_lead_journey(phone, {
+        "next_best_action": action,
+        "next_action_channel": channel,
+        "next_action_at": scheduled_at.isoformat() if hasattr(scheduled_at, "isoformat") else scheduled_at,
+        "next_followup_at": scheduled_at.isoformat() if hasattr(scheduled_at, "isoformat") else scheduled_at,
+        "last_followup_reason": reason,
+    })
+
+
+async def update_crm_contact_notes(phone: str, crm_notes: str) -> bool:
+    phone = normalize_phone(phone)
+    await _ensure_crm_contact(phone)
+    try:
+        return await get_repository().update_crm_contact(phone, {
+            "crm_notes": crm_notes,
+            "updated_at": datetime.now().isoformat(),
+        })
+    except Exception as exc:
+        logger.warning("update_crm_contact_notes: failed for %s: %s", phone, exc)
+        return False
+
+
+async def delete_crm_contact_by_phone(phone: str) -> bool:
+    """Hard-delete a CRM contact row by phone number.
+
+    Related call_logs / appointments / whatsapp records are NOT touched —
+    they are retained for audit purposes and reference the phone number,
+    not a foreign-key id, so they remain valid history rows.
+
+    Returns True if a row was deleted, False if no matching contact existed.
+    Raises ValueError if a DB constraint blocks deletion.
+    """
+    phone = normalize_phone(phone)
+    try:
+        return await get_repository().delete_crm_contact_by_phone(phone)
+    except Exception as exc:
+        logger.error("delete_crm_contact_by_phone: delete failed for %s: %s", phone, exc)
+        raise ValueError(f"Could not delete contact: {exc}") from exc
+
+
+async def get_crm_contact_by_phone(phone: str) -> Optional[dict]:
+    if not phone:
+        return None
+    try:
+        clean = normalize_phone(phone)
+    except Exception as exc:
+        logger.warning("get_crm_contact_by_phone: normalize failed for %r: %s", phone, exc)
+        return None
+    if not clean:
+        return None
+    try:
+        row = await get_repository().get_crm_contact_by_phone(clean)
+        if row:
+            return _crm_fallback_contact(row)
+    except Exception as exc:
+        logger.warning("get_crm_contact_by_phone: lookup failed for %s: %s", clean, exc)
+    try:
+        for row in await get_contacts():
+            if row.get("phone_number") == clean:
+                return _crm_fallback_contact(row)
+    except Exception as exc:
+        logger.warning("get_crm_contact_by_phone: fallback scan failed for %s: %s", clean, exc)
+    return None
+
+
+def _empty_crm_detail() -> dict:
+    return {
+        "contact": None,
+        "calls": [],
+        "appointments": [],
+        "latest_recording_url": "",
+        "summary": {
+            "total_calls": 0,
+            "last_outcome": None,
+            "last_call_at": None,
+            "has_active_recording": False,
+        },
+    }
+
+
+async def get_crm_contact_detail(phone: str) -> dict:
+    if not phone:
+        return _empty_crm_detail()
+    try:
+        clean = normalize_phone(phone)
+    except Exception as exc:
+        logger.warning("get_crm_contact_detail: normalize failed for %r: %s", phone, exc)
+        return _empty_crm_detail()
+    try:
+        contact = await get_crm_contact_by_phone(clean)
+    except Exception as exc:
+        logger.warning("get_crm_contact_detail: contact lookup failed for %s: %s", clean, exc)
+        contact = None
+    try:
+        calls = await get_calls_by_phone(clean)
+    except Exception as exc:
+        logger.warning("get_crm_contact_detail: calls lookup failed for %s: %s", clean, exc)
+        calls = []
+    try:
+        appointments = await get_appointments_by_phone(clean)
+    except Exception as exc:
+        logger.warning("get_crm_contact_detail: appointments lookup failed for %s: %s", clean, exc)
+        appointments = []
+    latest_recording_url = ""
+    for call in calls:
+        if call.get("recording_url") and not call.get("recording_deleted"):
+            latest_recording_url = call["recording_url"]
+            break
+    return {
+        "contact": contact,
+        "calls": calls,
+        "appointments": appointments,
+        "latest_recording_url": latest_recording_url,
+        "summary": {
+            "total_calls": len(calls),
+            "last_outcome": calls[0].get("outcome") if calls else None,
+            "last_call_at": calls[0].get("timestamp") if calls else None,
+            "has_active_recording": bool(latest_recording_url),
+        },
+    }
+
+
+async def get_crm_summary() -> dict:
+    rows = await get_crm_contacts()
+    today = datetime.now().date().isoformat()
+    return {
+        "total_leads": len(rows),
+        "new_leads": sum(1 for r in rows if r.get("crm_status") in ("New Lead", "New", "new_lead")),
+        "hot_leads": sum(1 for r in rows if r.get("crm_status") == "Hot Lead"),
+        "due_today": sum(1 for r in rows if (r.get("next_followup_at") or "").startswith(today)),
+        "no_answer": sum(1 for r in rows if r.get("last_call_outcome") == "no_answer"),
+        "booked": sum(1 for r in rows if r.get("last_call_outcome") == "booked"),
+        "closed_won": sum(1 for r in rows if r.get("crm_status") == "Closed Won"),
+        "closed_lost": sum(1 for r in rows if r.get("crm_status") == "Closed Lost"),
+    }
+
+
+async def get_stats() -> dict:
+    rows = await get_repository().list_call_logs(limit=5000)
+    total_calls = len(rows)
+    booked = sum(1 for r in rows if r.get("outcome") == "booked")
+    not_interested = sum(1 for r in rows if r.get("outcome") == "not_interested")
+    durations = [r["duration_seconds"] for r in rows if r.get("duration_seconds")]
+    outcomes = {}
+    daily = defaultdict(int)
+    dur_sum = defaultdict(float)
+    dur_cnt = defaultdict(int)
+    for r in rows:
+        o = r.get("outcome") or "unknown"
+        outcomes[o] = outcomes.get(o, 0) + 1
+        ts = (r.get("timestamp") or "")[:10]
+        if ts:
+            daily[ts] += 1
+        if r.get("duration_seconds"):
+            dur_sum[o] += r["duration_seconds"]
+            dur_cnt[o] += 1
+    today = datetime.now().date()
+    timeline = [{"date": (today - timedelta(days=i)).isoformat(), "count": daily.get((today - timedelta(days=i)).isoformat(), 0)} for i in range(13, -1, -1)]
+    return {"total_calls": total_calls, "booked": booked, "not_interested": not_interested, "avg_duration_seconds": round(sum(durations) / len(durations), 1) if durations else 0, "booking_rate_percent": round((booked / total_calls * 100) if total_calls else 0, 1), "outcomes": outcomes, "timeline": timeline, "duration_by_outcome": {o: dur_sum[o] / dur_cnt[o] for o in dur_sum}}
+
+
+async def create_campaign(name: str, contacts_json: str, schedule_type: str = "once", schedule_time: str = "09:00", call_delay_seconds: int = 3, system_prompt: Optional[str] = None, agent_profile_id: Optional[str] = None) -> str:
+    campaign_id = str(uuid.uuid4())
+    row = {"id": campaign_id, "name": name, "status": "active", "contacts_json": contacts_json, "schedule_type": schedule_type, "schedule_time": schedule_time, "call_delay_seconds": call_delay_seconds, "created_at": datetime.now().isoformat(), "total_dispatched": 0, "total_failed": 0}
+    if system_prompt:
+        row["system_prompt"] = system_prompt
+    if agent_profile_id:
+        row["agent_profile_id"] = agent_profile_id
+    await get_repository().create_campaign(row)
+    return campaign_id
+
+
+async def get_all_campaigns() -> list:
+    return await get_repository().list_campaigns()
+
+
+async def get_campaign(campaign_id: str) -> Optional[dict]:
+    try:
+        return await get_repository().get_campaign(campaign_id)
+    except Exception as exc:
+        logger.warning("get_campaign: lookup failed for %s: %s", campaign_id, exc)
+        return None
+
+
+async def update_campaign_status(campaign_id: str, status: str, claim_token: str = "") -> bool:
+    try:
+        return await get_repository().update_campaign(campaign_id, {"status": status}, claim_token=claim_token)
+    except Exception as exc:
+        logger.warning("update_campaign_status: failed for %s: %s", campaign_id, exc)
+        return False
+
+
+async def update_campaign_contacts(campaign_id: str, contacts: list, claim_token: str = "") -> bool:
+    """Persist campaign lead-progress (statuses) back to ``contacts_json``.
+
+    This is how sequential calling / pause / resume / stop survives a process
+    restart: every per-lead state transition is written back to the row.
+    """
+    payload = {"contacts_json": _json_mod.dumps(contacts), "updated_at": datetime.now().isoformat()}
+    try:
+        return await get_repository().update_campaign(campaign_id, payload, claim_token=claim_token)
+    except Exception as exc:
+        logger.warning("update_campaign_contacts: failed for %s: %s", campaign_id, exc)
+        return False
+
+
+async def update_campaign_run_stats(campaign_id: str, dispatched: int, failed: int, status: str = "completed", claim_token: str = "") -> None:
+    try:
+        await get_repository().update_campaign(
+            campaign_id,
+            {"last_run_at": datetime.now().isoformat(), "total_dispatched": dispatched, "total_failed": failed, "status": status, "claim_token": None, "lease_expires_at": None},
+            claim_token=claim_token,
+        )
+    except Exception as exc:
+        logger.warning("update_campaign_run_stats: failed for %s: %s", campaign_id, exc)
+
+
+async def delete_campaign(campaign_id: str) -> bool:
+    try:
+        return await get_repository().delete_campaign(campaign_id)
+    except Exception as exc:
+        logger.warning("delete_campaign: failed for %s: %s", campaign_id, exc)
+        return False
+
+
+async def add_contact_memory(phone: str, insight: str) -> None:
+    await get_repository().add_contact_memory(phone, insight)
+
+
+async def get_contact_memory(phone: str) -> list:
+    return await get_repository().get_contact_memory(phone, limit=20)
+
+
+async def compress_contact_memory(phone: str, compressed: str) -> None:
+    await get_repository().replace_contact_memory(phone, compressed)
+
+
+async def get_all_agent_profiles() -> list:
+    return await get_repository().list_agent_profiles()
+
+
+async def get_agent_profile(profile_id: str) -> Optional[dict]:
+    try:
+        return await get_repository().get_agent_profile(profile_id)
+    except Exception as exc:
+        logger.warning("get_agent_profile: lookup failed for %s: %s", profile_id, exc)
+        return None
+
+
+async def create_agent_profile(name: str, voice: str = "Kore", model: str = "gemini-3.1-flash-live-preview", system_prompt: Optional[str] = None, enabled_tools: str = "[]", is_default: bool = False) -> str:
+    profile_id = str(uuid.uuid4())
+    await get_repository().create_agent_profile(
+        {"id": profile_id, "name": name, "voice": voice, "model": model, "system_prompt": system_prompt, "enabled_tools": enabled_tools, "created_at": datetime.now().isoformat()},
+        set_default=is_default,
+    )
+    return profile_id
+
+
+async def update_agent_profile(profile_id: str, updates: dict) -> bool:
+    return await get_repository().update_agent_profile(profile_id, updates)
+
+
+async def delete_agent_profile(profile_id: str) -> bool:
+    return await get_repository().delete_agent_profile(profile_id)
+
+
+async def set_default_agent_profile(profile_id: str) -> None:
+    await get_repository().set_default_agent_profile(profile_id)
+
+
+# ── Knowledge Base helpers ────────────────────────────────────────────────────
+
+_KB_SETTING_KEY = "KNOWLEDGE_BASE_JSON"
+
+_KB_SECTIONS = [
+    "raw_markdown",
+    "company_profile",
+    "contact_details",
+    "working_hours",
+    "locations",
+    "services",
+    "packages",
+    "faqs",
+    "policies",
+    "appointment_rules",
+    "transfer_rules",
+]
+
+
+def _kb_default() -> dict:
+    return {
+        "raw_markdown": "",
+        "company_profile": {
+            "business_name": "Smile Dental and Implant Centre",
+            "legal_name": "Smile Dental and Implant Centre",
+            "short_description": "Best Dental Clinic in Kapra, ECIL, AS Rao Nagar, Secunderabad. Painless Root Canal, Dental Implants, Invisalign & Smile Designing.",
+            "about_us": "Smile Dental and Implant Centre is widely recognized as one of the best dental clinics in Secunderabad and Hyderabad (near Kapra Circle, Saket Road, ECIL). Led by senior dental surgeon Dr. P. Sudhakar (MDS - Periodontist & Implantologist with 15+ years of experience) and Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Specialist).",
+            "industry_type": "Dental Clinic & Implant Centre",
+            "owner_name": "Dr. P. Sudhakar (BDS, MDS)",
+            "website": "https://smiledentalandimplantcentre.com/",
+            "email": "smiledentalandimplantcentre@gmail.com",
+            "phone": "+917396529265",
+            "whatsapp_number": "+917396529265",
+        },
+        "contact_details": {
+            "primary_phone": "+91 7396529265",
+            "support_phone": "+91 9490618635",
+            "whatsapp_number": "+91 7396529265",
+            "email": "smiledentalandimplantcentre@gmail.com",
+            "website": "https://smiledentalandimplantcentre.com/",
+            "address": "H.No. 1-1-308/8, Plot No. 8, 1st Floor, Above K. Rathod Jewellers, Sri Ram Nagar Colony, Near Kapra Circle, Saket Road, ECIL",
+            "city": "Secunderabad / Hyderabad",
+            "state": "Telangana",
+            "country": DEFAULT_COUNTRY,
+            "google_maps_link": "https://maps.google.com/?cid=11928096181775791226",
+        },
+        "working_hours": {
+            "timezone": DEFAULT_TIMEZONE,
+            "opening_days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+            "opening_time": "09:00",
+            "closing_time": "21:00",
+            "holiday_notes": "Open Monday to Saturday 9:00 AM to 9:00 PM. Sundays open 10:00 AM to 1:00 PM for prior appointments and emergencies.",
+            "emergency_support_available": True,
+        },
+        "locations": [],
+        "services": [],
+        "packages": [],
+        "faqs": [],
+        "policies": {
+            "cancellation_policy": "",
+            "refund_policy": "",
+            "privacy_policy": "",
+            "appointment_policy": "",
+            "payment_policy": "",
+            "terms_notes": "",
+        },
+        "appointment_rules": {
+            "appointment_required": False,
+            "allow_same_day_booking": True,
+            "appointment_duration_minutes": 30,
+            "appointment_buffer_minutes": 15,
+            "default_visit_type": "phone_consultation",
+            "confirmation_required": True,
+            "reminder_before_hours": 24,
+        },
+        "transfer_rules": {
+            "transfer_enabled": False,
+            "transfer_number": "",
+            "transfer_conditions": "",
+            "working_hours_only": True,
+        },
+    }
+
+
+def _safe_json_loads(text: str, fallback=None):
+    if not text:
+        return fallback
+    try:
+        return _json_mod.loads(text)
+    except Exception:
+        return fallback
+
+
+async def get_knowledge_base() -> dict:
+    raw = await get_setting(_KB_SETTING_KEY, "")
+    stored = _safe_json_loads(raw, {})
+    base = _kb_default()
+    if isinstance(stored, dict):
+        for section in _KB_SECTIONS:
+            if section in stored:
+                base[section] = stored[section]
+    return base
+
+
+async def save_knowledge_base(data: dict) -> dict:
+    base = await get_knowledge_base()
+    if isinstance(data, dict):
+        for section in _KB_SECTIONS:
+            if section in data:
+                base[section] = data[section]
+    await set_setting(_KB_SETTING_KEY, _json_mod.dumps(base, ensure_ascii=False))
+    return base
+
+
+async def get_kb_section(section_name: str):
+    if section_name not in _KB_SECTIONS:
+        return None
+    kb = await get_knowledge_base()
+    return kb.get(section_name)
+
+
+async def save_kb_section(section_name: str, data) -> dict:
+    if section_name not in _KB_SECTIONS:
+        raise ValueError(f"Unknown KB section: {section_name}")
+    kb = await get_knowledge_base()
+    kb[section_name] = data
+    await set_setting(_KB_SETTING_KEY, _json_mod.dumps(kb, ensure_ascii=False))
+    return kb
+
+
+def get_active_services(kb: dict) -> list:
+    return [s for s in (kb.get("services") or []) if s.get("active", True)]
+
+
+def get_active_packages(kb: dict) -> list:
+    return [p for p in (kb.get("packages") or []) if p.get("active", True)]
+
+
+def get_active_faqs(kb: dict) -> list:
+    return [f for f in (kb.get("faqs") or []) if f.get("active", True)]
+
+
+def get_company_contact_summary(kb: dict) -> str:
+    cp = kb.get("company_profile", {})
+    cd = kb.get("contact_details", {})
+    parts = []
+    if cp.get("business_name"):
+        parts.append(f"Business: {cp['business_name']}")
+    if cp.get("industry_type"):
+        parts.append(f"Industry: {cp['industry_type']}")
+    phone = cd.get("primary_phone") or cp.get("phone") or ""
+    if phone:
+        parts.append(f"Phone: {phone}")
+    email = cd.get("email") or cp.get("email") or ""
+    if email:
+        parts.append(f"Email: {email}")
+    website = cd.get("website") or cp.get("website") or ""
+    if website:
+        parts.append(f"Website: {website}")
+    addr_parts = [cd.get("address"), cd.get("city"), cd.get("state"), cd.get("country")]
+    addr = ", ".join(x for x in addr_parts if x)
+    if addr:
+        parts.append(f"Address: {addr}")
+    return " | ".join(parts)
+
+
+def get_appointment_rules_summary(kb: dict) -> str:
+    ar = kb.get("appointment_rules", {})
+    lines = []
+    if ar.get("appointment_required"):
+        lines.append("Appointment required: Yes")
+    if ar.get("allow_same_day_booking"):
+        lines.append("Same-day booking: Allowed")
+    if ar.get("appointment_duration_minutes"):
+        lines.append(f"Duration: {ar['appointment_duration_minutes']} min")
+    if ar.get("default_visit_type"):
+        lines.append(f"Visit type: {ar['default_visit_type']}")
+    if ar.get("confirmation_required"):
+        lines.append("Confirmation required: Yes")
+    return "; ".join(lines)

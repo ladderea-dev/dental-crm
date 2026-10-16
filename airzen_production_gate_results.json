@@ -1,0 +1,45 @@
+{
+  "checks": [],
+  "commands": [
+    {
+      "name": "python_tests",
+      "returncode": 0,
+      "started_at": "2026-07-18T00:00:00+00:00",
+      "status": "passed",
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "name": "whatsapp_dry_run",
+      "returncode": 0,
+      "started_at": "2026-07-18T00:00:00+00:00",
+      "status": "passed",
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "name": "compile_core",
+      "returncode": 0,
+      "started_at": "2026-07-18T00:00:00+00:00",
+      "status": "passed",
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "name": "postgres_atomic_outbox_integration",
+      "returncode": 0,
+      "started_at": "2026-07-18T00:00:00+00:00",
+      "status": "passed",
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "critical_failures": [],
+  "database_write_tests_executed": false,
+  "generated_at": "2026-09-11T05:07:17.130622+00:00",
+  "idempotency_verified": true,
+  "mode": "staging",
+  "real_messages_sent": 0,
+  "restart_recovery_verified": false,
+  "status": "passed"
+}

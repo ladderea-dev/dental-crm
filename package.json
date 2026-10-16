@@ -1,0 +1,12 @@
+{
+  "name": "airzen-crm-e2e",
+  "private": true,
+  "scripts": {
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "typescript": "^5.9.0"
+  }
+}

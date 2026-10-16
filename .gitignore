@@ -1,0 +1,23 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite
+*.log
+venv/
+.venv/
+.mysql-staging/
+node_modules/
+test-results/
+*.egg-info/
+dist/
+build/
+.DS_Store
+
+# Reference project — kept locally for pattern reference only, not part of this repo
+LIvekitAIVoice/
+playwright-report/
+playwright-errors-*/
+playwright-errors-*.zip
+playwright/.auth/

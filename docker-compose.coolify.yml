@@ -1,0 +1,58 @@
+version: "3.8"
+
+services:
+  crm-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voicecall-crm
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+      # Brand Settings
+      - BUSINESS_NAME=${BUSINESS_NAME:-Voice Calling CRM}
+      - BUSINESS_TYPE=${BUSINESS_TYPE:-Service}
+      - DEFAULT_SERVICE_TYPE=${DEFAULT_SERVICE_TYPE:-Consultation}
+      - APP_TIMEZONE=${APP_TIMEZONE:-Asia/Kolkata}
+      - APP_COUNTRY=${APP_COUNTRY:-India}
+      - APP_COUNTRY_CODE=${APP_COUNTRY_CODE:-+91}
+      # Telephony & LiveKit
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - OUTBOUND_TRUNK_ID=${OUTBOUND_TRUNK_ID}
+      - CALLER_ID=${CALLER_ID}
+      # AI Voice & LLM
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.1-flash-live-preview}
+      - GEMINI_TTS_VOICE=${GEMINI_TTS_VOICE:-Kore}
+      - USE_GEMINI_REALTIME=${USE_GEMINI_REALTIME:-true}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY:-}
+      # Database Backend (Supabase or MySQL)
+      - CRM_DB_BACKEND=${CRM_DB_BACKEND:-${AIRZEN_DB_BACKEND:-supabase}}
+      - AIRZEN_DB_BACKEND=${AIRZEN_DB_BACKEND:-${CRM_DB_BACKEND:-supabase}}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY:-}
+      # WhatsApp Automation & Telephony Mode
+      - OUTBOUND_CALLING_ENABLED=${OUTBOUND_CALLING_ENABLED:-false}
+      - ENABLE_VOICE_AGENT=${ENABLE_VOICE_AGENT:-false}
+      - FOLLOWUP_ENABLED=${FOLLOWUP_ENABLED:-true}
+      - FOLLOWUP_NO_RESPONSE_TEMPLATE_DELAY_HOURS=${FOLLOWUP_NO_RESPONSE_TEMPLATE_DELAY_HOURS:-24}
+      - FOLLOWUP_MAX_WHATSAPP_FOLLOWUPS=${FOLLOWUP_MAX_WHATSAPP_FOLLOWUPS:-3}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID:-}
+      - WHATSAPP_ACCESS_TOKEN=${WHATSAPP_ACCESS_TOKEN:-}
+      - WHATSAPP_BUSINESS_ACCOUNT_ID=${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      - WHATSAPP_WEBHOOK_VERIFY_TOKEN=${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
+      # Admin Auth
+      - AUTH_ENABLED=${AUTH_ENABLED:-false}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s

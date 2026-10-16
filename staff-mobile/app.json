@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "AirZen Staff",
+    "slug": "airzen-staff",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.airzensg.staff",
+      "permissions": [
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "locationWhenInUsePermission": "AirZen uses your location only while you are travelling to or servicing an assigned customer.",
+          "locationAlwaysAndWhenInUsePermission": "AirZen uses background location during an active assigned job so dispatch can track arrival progress."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "AirZen uses the camera for arrival selfies and payment proof.",
+          "photosPermission": "AirZen accesses selected photos only when you attach payment proof.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ]
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
