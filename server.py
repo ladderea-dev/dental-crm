@@ -133,7 +133,7 @@ from telecaller import (
 from openrouter import openrouter_chat_completion, get_openrouter_default_model
 
 
-load_dotenv(".env", override=False)
+load_dotenv(".env", override=True)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("server")
 VOICE_FLOW_RUNTIME = "v4_combined_opening"
