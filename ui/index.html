@@ -642,6 +642,15 @@ tr.lead-row:hover{background:rgba(255,255,255,0.02)}
 .tc-card-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
 .tc-card-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .tc-card-actions button{padding:5px 10px;font-size:0.78rem;min-height:30px;border-radius:7px}
+@media print {
+  body * { visibility: hidden !important; }
+  #printable-invoice, #printable-invoice * { visibility: visible !important; }
+  #printable-invoice {
+    position: fixed; left: 0; top: 0; width: 100%; margin: 0; padding: 25px;
+    background: #ffffff !important; color: #000000 !important; box-shadow: none !important;
+  }
+  .modal-actions, .modal-close { display: none !important; }
+}
 </style>
 </head>
 <body>
@@ -720,6 +729,93 @@ tr.lead-row:hover{background:rgba(255,255,255,0.02)}
 </div>
 </section>
 <section id="appointments" class="panel"><div class="card"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2>📅 Appointments</h2><button class="primary" style="font-weight:700" onclick="openBookAppointmentModal()">➕ Book New Appointment</button></div><div class="row" style="margin-top:10px"><input id="appt-search" placeholder="Search name or phone"><input id="appt-date" type="date"><select id="appt-status"><option value="">All statuses</option><option value="booked">Booked</option><option value="completed">Completed</option><option value="no_show">No Show</option><option value="cancelled">Cancelled</option><option value="rescheduled">Rescheduled</option></select><button onclick="loadAppointments()">Filter</button></div><div id="appt-list" style="margin-top:16px;overflow-x:auto"></div></div><div class="card" style="margin-top:16px"><h2>Appointment Settings</h2><p class="muted" style="margin-bottom:12px">Configure appointment wording and delivery for any industry. This controls WhatsApp confirmations and new bookings.</p><div class="grid cols-3"><div><label>Industry preset</label><select id="appt-industry-preset" onchange="applyAppointmentPreset(this.value)"><option value="custom">Custom</option><option value="service">Field / home service</option><option value="interior">Interior site measurement</option><option value="software">Software product demo</option><option value="clinic">🏥 Doctor / Clinic consultation</option><option value="dental">🦷 Dental clinic consultation</option></select></div><div><label>Appointment name</label><input id="appt-name" placeholder="Service appointment"></div><div><label>Default service / purpose</label><input id="appt-default-service" placeholder="General service"></div><div><label>Delivery mode</label><select id="appt-delivery-mode"><option value="onsite">On-site</option><option value="online">Online meeting</option><option value="phone">Phone call</option><option value="hybrid">Decide per booking</option></select></div><div><label>Location field label</label><input id="appt-location-label" placeholder="Service address"></div><div><label>Staff label</label><input id="appt-staff-label" placeholder="Technician / Consultant"></div><div><label>Default staff role</label><input id="appt-default-role" placeholder="service_staff"></div><div><label>Assignment</label><input id="appt-assignment" value="round_robin" readonly title="Available staff are assigned in round-robin order"></div><div><label>Default duration (minutes)</label><input id="appt-demo-duration" type="number" min="1" value="30"></div><div><label>Buffer minutes</label><input id="appt-buffer" type="number" min="0" value="15"></div><div><label>Slot interval</label><input id="appt-slot-interval" type="number" min="0" placeholder="duration + buffer"></div><div><label>Working timezone</label><input id="appt-timezone" data-timezone-input data-default-timezone="true" value="Asia/Singapore"></div><div><label>Minimum notice time</label><input id="appt-min-notice" type="number" min="0" value="30"></div><div><label>Max booking days ahead</label><input id="appt-max-days" type="number" min="1" value="30"></div></div><div class="row" style="margin-top:12px"><button class="primary" onclick="saveAppointmentSettings()">Save Appointment Settings</button><button onclick="loadAppointmentSettings()">Refresh</button><button onclick="loadCalendarHealth()">Calendar Health</button></div><div id="calendar-health-box" class="row" style="margin-top:10px"></div></div><div class="card" style="margin-top:16px"><h2>Staff Planning</h2><p id="staff-form-mode" class="muted" style="margin-bottom:12px">New Staff</p><p class="muted" style="margin-bottom:12px">Add technicians, surveyors, consultants, sales staff, or demo specialists. Working hours and calendar availability are checked before round-robin assignment.</p><div class="grid cols-3"><input id="staff-name" placeholder="Name"><input id="staff-email" placeholder="Email"><input id="staff-whatsapp" placeholder="WhatsApp number"><input id="staff-role" list="staff-role-options" placeholder="Role / skill" value="service_staff"><datalist id="staff-role-options"><option value="doctor"><option value="dentist"><option value="physician"><option value="consultant"><option value="clinic_receptionist"><option value="nurse"><option value="service_staff"><option value="technician"><option value="site_surveyor"><option value="interior_designer"><option value="sales_consultant"><option value="demo_specialist"><option value="support_agent"></datalist><input id="staff-calendar" placeholder="Calendar email"><input id="staff-google-calendar" placeholder="Google Calendar ID"><div><label>Working days</label><div id="staff-days" class="staff-days-picker" role="group" aria-label="Working days"></div></div><input id="staff-timezone" data-timezone-input data-default-timezone="true" placeholder="Timezone" value="Asia/Singapore"><input id="staff-start" type="time" value="09:00"><input id="staff-end" type="time" value="18:00"><input id="staff-order" type="number" value="0" placeholder="Round-robin order"><label><input id="staff-active" type="checkbox" checked style="width:auto"> Active</label><label><input id="staff-calendar-connected" type="checkbox" style="width:auto"> Calendar connected</label><label><input id="staff-meet-enabled" type="checkbox" style="width:auto"> Create Google Meet for online bookings</label><textarea id="staff-notes" placeholder="Skills, service areas, languages, or planning notes"></textarea></div><div class="row" style="margin-top:12px"><button id="staff-save-button" class="primary" onclick="saveAppointmentStaff()">Create Staff</button><button onclick="resetAppointmentStaffForm()">New Staff</button><button id="staff-cancel-edit" style="display:none" onclick="resetAppointmentStaffForm()">Cancel Edit</button></div><input id="staff-id" type="hidden"><div id="appt-staff-list" style="margin-top:12px"></div></div></section>
+<section id="billing" class="panel">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div>
+        <h2 style="margin:0;display:flex;align-items:center;gap:8px">💳 Dental Billing, Invoices &amp; Revenue</h2>
+        <p class="muted" style="margin:4px 0 0;font-size:0.85rem">Track patient dental treatments, generate itemized tax bills, record installments, and monitor doctor-wise clinic revenue.</p>
+      </div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button class="primary" style="font-weight:700" onclick="openCreateInvoiceModal()">➕ Generate New Bill</button>
+        <button onclick="exportBillingSalesCSV()">📥 Download Sales CSV</button>
+        <button onclick="loadBillingRevenueUI()">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Revenue KPI Cards -->
+    <div id="billing-kpis" class="grid cols-4" style="margin-top:16px;gap:12px">
+      <div class="card" style="border-left:4px solid #3b82f6;padding:12px">
+        <div class="muted" style="font-size:0.82rem">Total Billed</div>
+        <div class="kpi" id="kpi-total-billed" style="font-size:1.6rem">₹0.00</div>
+        <div class="muted" style="font-size:0.75rem" id="kpi-invoice-count">0 Invoices</div>
+      </div>
+      <div class="card" style="border-left:4px solid #10b981;padding:12px">
+        <div class="muted" style="font-size:0.82rem">Total Collected</div>
+        <div class="kpi" id="kpi-total-collected" style="font-size:1.6rem;color:#10b981">₹0.00</div>
+        <div class="muted" style="font-size:0.75rem" id="kpi-collection-rate">100% Realized</div>
+      </div>
+      <div class="card" style="border-left:4px solid #ef4444;padding:12px">
+        <div class="muted" style="font-size:0.82rem">Total Outstanding</div>
+        <div class="kpi" id="kpi-total-outstanding" style="font-size:1.6rem;color:#ef4444">₹0.00</div>
+        <div class="muted" style="font-size:0.75rem" id="kpi-pending-count">0 Pending</div>
+      </div>
+      <div class="card" style="border-left:4px solid #8b5cf6;padding:12px">
+        <div class="muted" style="font-size:0.82rem">Avg Bill Value</div>
+        <div class="kpi" id="kpi-avg-bill" style="font-size:1.6rem">₹0.00</div>
+        <div class="muted" style="font-size:0.75rem" id="kpi-total-discount">₹0 Discount given</div>
+      </div>
+    </div>
+
+    <!-- Revenue Breakdown Cards -->
+    <div class="grid cols-3" style="gap:14px;margin-top:16px">
+      <!-- Doctor Attribution -->
+      <div class="card" style="background:color-mix(in srgb,var(--card) 94%,var(--primary) 6%);border:1px solid var(--border)">
+        <h3 style="margin-top:0;font-size:1rem;display:flex;align-items:center;gap:6px">👨‍⚕️ Doctor Revenue Share</h3>
+        <div id="billing-doctor-breakdown" style="margin-top:10px">Loading...</div>
+      </div>
+      <!-- Top Treatments Revenue -->
+      <div class="card" style="background:color-mix(in srgb,var(--card) 94%,var(--accent) 6%);border:1px solid var(--border)">
+        <h3 style="margin-top:0;font-size:1rem;display:flex;align-items:center;gap:6px">🦷 Top Dental Procedures</h3>
+        <div id="billing-treatment-breakdown" style="margin-top:10px">Loading...</div>
+      </div>
+      <!-- Payment Methods -->
+      <div class="card" style="background:color-mix(in srgb,var(--card) 94%,var(--success) 6%);border:1px solid var(--border)">
+        <h3 style="margin-top:0;font-size:1rem;display:flex;align-items:center;gap:6px">💵 Payment Channels</h3>
+        <div id="billing-method-breakdown" style="margin-top:10px">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="card" style="margin-top:16px;padding:12px;background:color-mix(in srgb,var(--card) 92%,var(--input) 8%)">
+      <div class="row" style="gap:10px;flex-wrap:wrap;align-items:center">
+        <input id="billing-search" placeholder="🔍 Search patient name, phone, or SD-2026-..." style="flex:2;min-width:200px" onkeydown="if(event.key==='Enter')loadBillingRevenueUI()">
+        <select id="billing-filter-doctor" style="flex:1;min-width:140px">
+          <option value="">All Attending Doctors</option>
+          <option value="Dr. P. Sudhakar">Dr. P. Sudhakar (Chief Implantologist)</option>
+          <option value="Dr. K. Mounika">Dr. K. Mounika (Cosmetic Specialist)</option>
+        </select>
+        <select id="billing-filter-status" style="width:140px">
+          <option value="">All Statuses</option>
+          <option value="paid">Paid in Full</option>
+          <option value="partial">Partial / Balance Due</option>
+          <option value="pending">Pending Payment</option>
+        </select>
+        <input id="billing-from" type="date" title="From Date" style="width:135px">
+        <input id="billing-to" type="date" title="To Date" style="width:135px">
+        <button class="primary" onclick="loadBillingRevenueUI()">Filter</button>
+        <button onclick="resetBillingFilters()">Reset</button>
+      </div>
+    </div>
+
+    <!-- Invoices List -->
+    <div class="row" style="margin-top:20px;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Patient Invoices &amp; Receipts</h3>
+      <span id="billing-invoices-count" class="muted" style="font-size:0.85rem">0 found</span>
+    </div>
+    <div id="billing-invoices-table" style="margin-top:10px;overflow-x:auto"></div>
+  </div>
+</section>
 <section id="batch-monitor" class="panel"><div class="card"><h2>📡 Batch Call Monitor</h2><div id="bm-status-bar" class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:12px"></div><div id="bm-stats" class="grid cols-4" style="margin-bottom:12px"></div><div id="bm-window-warn" style="display:none;padding:10px;background:color-mix(in srgb,var(--danger) 12%,var(--card));border:1px solid color-mix(in srgb,var(--danger) 55%,transparent);border-radius:8px;margin-bottom:10px;color:var(--danger)"></div><div class="row" style="gap:8px"><button id="bm-pause-btn" class="warn" onclick="batchAction('paused')">⏸ Pause</button><button id="bm-resume-btn" class="primary" onclick="batchAction('running')">▶ Resume</button><button id="bm-stop-btn" class="danger" onclick="batchAction('stopped')">⏹ Stop</button><button onclick="refreshBatchMonitor()">🔄 Refresh</button></div><div id="bm-items" style="margin-top:12px"></div></div></section>
 <section id="scheduled" class="panel"><div class="card"><h2>📅 Scheduled Calls</h2><div id="sched-window-bar" style="padding:8px 14px;border-radius:8px;margin-bottom:12px;font-weight:600"></div><div class="row" style="gap:8px;margin-bottom:12px"><button class="primary" onclick="startDueTodayCalls()">🔥 Start Due Today Calls</button><button onclick="loadScheduledCalls()">🔄 Refresh</button></div><div class="grid cols-3" id="sched-counts" style="margin-bottom:12px"></div><h3 style="margin-top:8px">Due Today</h3><div id="sched-due-today"></div><h3 style="margin-top:8px">Overdue</h3><div id="sched-overdue"></div><h3 style="margin-top:8px">Upcoming Today</h3><div id="sched-upcoming"></div></div></section>
 <section id="calls" class="panel"><div class="card"><h2>📝 Call Logs</h2><div class="row"><button class="primary" onclick="exportCalls('xlsx')">Export Excel</button><button onclick="exportCalls('csv')">Export CSV</button></div><div id="calls-list"></div><div class="row"><button onclick="loadCalls(callPage-1)">Prev</button><span id="call-page"></span><button onclick="loadCalls(callPage+1)">Next</button></div></div></section>
@@ -1640,13 +1736,13 @@ function showInlineMessage(id,msg,type='err'){const el=$(id);if(el){el.innerHTML
 function showLogin(msg=''){closeMobileMenu();const el=$('login-error');if(el){el.textContent=msg;const t=String(msg).trim();el.style.display=(t===''||t==='{}')?'none':'';}document.body.classList.remove('authenticated')}
 function showDashboard(){document.body.classList.add('authenticated');const role=window._currentUserRole||'admin';const isTelecallerOnly=(role==='telecaller');['settings','costs','broadcast','logs','setup','campaigns','agents','prompt','automation'].forEach(t=>{document.querySelectorAll(`[data-tab="${t}"]`).forEach(btn=>btn.style.display=isTelecallerOnly?'none':'')});if(isTelecallerOnly){switchTab('telecaller')}else{try{loadStats()}catch(e){}try{loadCalls()}catch(e){}try{loadAppointments()}catch(e){}try{loadLogs()}catch(e){}try{loadAgentProfiles()}catch(e){}}}
 async function checkAuth(){try{const r=await api('/api/auth/me');if(r.authenticated){window._currentUser=r.username||'admin';window._currentUserRole=r.role||'admin';showDashboard()}else{showLogin(r.error||'')}}catch(e){showLogin(e.message||'')}}
-const sidebarIcons={stats:'📊',telecaller:'🎧',single:'📞',batch:'📋','batch-monitor':'📡',campaigns:'🚀',scheduled:'📅',agents:'🤖',prompt:'✏️',kb:'📚',automation:'⚡',whatsapp:'💬','staff-ops':'🧭',appointments:'📅',calls:'📝',crm:'👥',kanban:'▦',reports:'📈',costs:'₹',broadcast:'📣',handoffs:'🤝',settings:'⚙️',logs:'📋',setup:'🔧'};
-const tabs=[['stats','📊 Stats'],['telecaller','🎧 Telecaller'],['single','📞 Single Call'],['batch','📋 Batch Call'],['batch-monitor','📡 Batch Monitor'],['campaigns','🚀 Campaigns'],['scheduled','📅 Scheduled Calls'],['agents','🤖 Agents'],['prompt','✏️ AI Prompt'],['kb','📚 Knowledge Base'],['automation','⚡ Automation'],['whatsapp','💬 WhatsApp'],['staff-ops','🧭 Staff Operations'],['appointments','📅 Appointments'],['calls','📝 Call Logs'],['crm','👥 CRM'],['kanban','Pipeline'],['reports','Reports'],['costs','Costs'],['broadcast','Broadcast'],['handoffs','Handoffs'],['settings','⚙️ Settings'],['logs','📋 Logs'],['setup','🔧 Setup']];
+const sidebarIcons={stats:'📊',telecaller:'🎧',single:'📞',batch:'📋','batch-monitor':'📡',campaigns:'🚀',scheduled:'📅',agents:'🤖',prompt:'✏️',kb:'📚',automation:'⚡',whatsapp:'💬','staff-ops':'🧭',appointments:'📅',billing:'💳',calls:'📝',crm:'👥',kanban:'▦',reports:'📈',costs:'₹',broadcast:'📣',handoffs:'🤝',settings:'⚙️',logs:'📋',setup:'🔧'};
+const tabs=[['stats','📊 Stats'],['telecaller','🎧 Telecaller'],['single','📞 Single Call'],['batch','📋 Batch Call'],['batch-monitor','📡 Batch Monitor'],['campaigns','🚀 Campaigns'],['scheduled','📅 Scheduled Calls'],['agents','🤖 Agents'],['prompt','✏️ AI Prompt'],['kb','📚 Knowledge Base'],['automation','⚡ Automation'],['whatsapp','💬 WhatsApp'],['staff-ops','🧭 Staff Operations'],['appointments','📅 Appointments'],['billing','💳 Billing & Revenue'],['calls','📝 Call Logs'],['crm','👥 CRM'],['kanban','Pipeline'],['reports','Reports'],['costs','Costs'],['broadcast','Broadcast'],['handoffs','Handoffs'],['settings','⚙️ Settings'],['logs','📋 Logs'],['setup','🔧 Setup']];
 function scheduleLogsRefresh(){setInterval(()=>{if(!logsPaused&&document.body.classList.contains('authenticated'))try{loadLogs()}catch(e){}},8000)}
 async function loadLeadStatuses(){try{const r=await api('/api/crm/statuses');leadStatuses=Array.isArray(r)?r:(r.data||[]);}catch(e){leadStatuses=[]}}
 async function logout(){closeMobileMenu();document.querySelectorAll('[data-tab]').forEach(btn=>btn.style.display='');await fetch('/api/auth/logout',{method:'POST'});showLogin('')}
 let _staffOpsTimer=null;
-function switchTab(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===name));syncMobileMenuActive(name);if(_staffOpsTimer){clearInterval(_staffOpsTimer);_staffOpsTimer=null}if(name==='stats')loadStats();if(name==='telecaller')loadTelecallerWorkspace();if(name==='campaigns'){loadCampaigns();_startCampaignProgressPoll()}if(name==='batch-monitor')refreshBatchMonitor();if(name==='scheduled')loadScheduledCalls();if(name==='agents')loadAgentProfiles();if(name==='prompt'){initPromptManager();}if(name==='kb')initKB();if(name==='automation')initAutomation();if(name==='whatsapp')initWhatsApp();if(name==='staff-ops'){loadStaffOperations();_staffOpsTimer=setInterval(loadStaffOperations,30000)}if(name==='appointments')loadAppointments();if(name==='calls')loadCalls();if(name==='crm')loadCRM();if(name==='kanban')loadKanban();if(name==='reports')loadReports();if(name==='costs')loadCosts();if(name==='broadcast'){loadBroadcastConfig();loadBroadcastCampaigns();}if(name==='handoffs')loadHandoffs();if(name==='settings'){loadSettings();loadOutboundSchedule();loadUsersUI();}if(name==='setup')initCustomerSetup();if(name==='logs')loadLogs()}
+function switchTab(name){document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id===name));syncMobileMenuActive(name);if(_staffOpsTimer){clearInterval(_staffOpsTimer);_staffOpsTimer=null}if(name==='stats')loadStats();if(name==='telecaller')loadTelecallerWorkspace();if(name==='campaigns'){loadCampaigns();_startCampaignProgressPoll()}if(name==='batch-monitor')refreshBatchMonitor();if(name==='scheduled')loadScheduledCalls();if(name==='agents')loadAgentProfiles();if(name==='prompt'){initPromptManager();}if(name==='kb')initKB();if(name==='automation')initAutomation();if(name==='whatsapp')initWhatsApp();if(name==='staff-ops'){loadStaffOperations();_staffOpsTimer=setInterval(loadStaffOperations,30000)}if(name==='appointments')loadAppointments();if(name==='billing')loadBillingRevenueUI();if(name==='calls')loadCalls();if(name==='crm')loadCRM();if(name==='kanban')loadKanban();if(name==='reports')loadReports();if(name==='costs')loadCosts();if(name==='broadcast'){loadBroadcastConfig();loadBroadcastCampaigns();}if(name==='handoffs')loadHandoffs();if(name==='settings'){loadSettings();loadOutboundSchedule();loadUsersUI();}if(name==='setup')initCustomerSetup();if(name==='logs')loadLogs()}
 function _chartOptions(type){
   const c=getThemeChartColors();
   const common={
@@ -2515,6 +2611,735 @@ async function loadAppointmentSettings(){try{ensureAppointmentWorkspace();const 
 async function saveAppointmentSettings(){ensureAppointmentWorkspace();const body={appointment_name:$('appt-name').value,default_service_type:$('appt-default-service').value,delivery_mode:$('appt-delivery-mode').value,location_label:$('appt-location-label').value,staff_label:$('appt-staff-label').value,default_staff_role:$('appt-default-role').value,assignment_strategy:'round_robin',intake_prompt:$('appt-intake-prompt').value,duration_minutes:+$('appt-demo-duration').value,buffer_minutes:+$('appt-buffer').value,slot_interval_minutes:+$('appt-slot-interval').value||0,timezone:$('appt-timezone').value,minimum_notice_minutes:+$('appt-min-notice').value,max_booking_days_ahead:+$('appt-max-days').value};await api('/api/appointments/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});toast('Appointment settings saved');loadAppointmentSettings()}
 async function loadReports(){const p=new URLSearchParams();if($('rep-from').value)p.set('date_from',$('rep-from').value);if($('rep-to').value)p.set('date_to',$('rep-to').value);const s=await api('/api/reports/summary?'+p.toString());const cards=[['Calls',s.calls_total],['Answered',s.answered],['WhatsApp Sent',s.whatsapp_sent],['Appointments',s.appointments_booked],['Converted',s.converted_leads],['Lost',s.lost_leads],['Duration Min',s.total_duration_minutes],['No Show',s.demo_no_show]];$('reports-summary').innerHTML=cards.map(([k,v])=>`<div class="card"><div>${esc(k)}</div><div class="kpi">${esc(v??0)}</div></div>`).join('');$('reports-detail').innerHTML=`<div class="grid cols-2"><div class="card"><h3>Source-wise Leads</h3>${table(Object.entries(s.source_wise_leads||{}).map(([source,count])=>({source,count})))}</div><div class="card"><h3>Staff-wise Appointments</h3>${table(Object.entries(s.staff_wise_appointments||{}).map(([staff,count])=>({staff,count})))}</div></div>`;try{await loadTelecallerPerformanceUI();}catch(_){}}
 async function loadCosts(){const p=new URLSearchParams();if($('cost-from').value)p.set('date_from',$('cost-from').value);if($('cost-to').value)p.set('date_to',$('cost-to').value);const s=await api('/api/costs/summary?'+p.toString());const cards=[['Voice Minutes',s.voice_minutes],['Gemini Voice',s.estimated_gemini_voice_cost],['SIP/Call',s.sip_call_cost],['Recording',s.recording_cost],['WA Templates',s.whatsapp_template_cost],['Total',s.total_estimated_cost],['Cost / Lead',s.estimated_cost_per_lead],['Cost / Appt',s.estimated_cost_per_appointment]];$('cost-summary').innerHTML=cards.map(([k,v])=>`<div class="card"><div>${esc(k)} <span class="muted">${esc(s.currency||'INR')}</span></div><div class="kpi">${esc(v??0)}</div></div>`).join('')}
+
+// ── Dental Clinic Billing, Invoicing & Revenue Management ─────────────────────
+const DENTAL_PROCEDURES = [
+  { name: 'Dental Checkup & Consultation', price: 500 },
+  { name: 'Scaling & Polishing (Cleaning)', price: 1500 },
+  { name: 'Composite Dental Filling (Per Tooth)', price: 2000 },
+  { name: 'Root Canal Treatment (RCT)', price: 4500 },
+  { name: 'Rotary Endodontics + Post & Core', price: 6500 },
+  { name: 'Zirconia / Ceramic Crown', price: 8000 },
+  { name: 'PFM (Porcelain Fused to Metal) Crown', price: 4000 },
+  { name: 'Dental Implant (Titanium Fixture)', price: 25000 },
+  { name: 'Full Mouth Dental Implants (All-on-4)', price: 150000 },
+  { name: 'Simple Tooth Extraction', price: 1200 },
+  { name: 'Surgical Wisdom Tooth Removal', price: 5000 },
+  { name: 'In-Office Laser Teeth Whitening', price: 7500 },
+  { name: 'Clear Aligners Consultation', price: 1000 },
+  { name: 'Pediatric Dental Pulpectomy', price: 3000 },
+  { name: 'Complete Dentures (Upper & Lower Set)', price: 28000 },
+  { name: 'Other Dental Procedure', price: 0 }
+];
+
+let _billingItems = [];
+
+function fmtInr(num) {
+  const n = Number(num || 0);
+  return '₹' + n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function loadBillingRevenueUI() {
+  const q = $('billing-search')?.value || '';
+  const status = $('billing-filter-status')?.value || '';
+  const doctor = $('billing-filter-doctor')?.value || '';
+  const dateFrom = $('billing-from')?.value || '';
+  const dateTo = $('billing-to')?.value || '';
+
+  // 1. Fetch Revenue Summary KPIs
+  try {
+    const pSum = new URLSearchParams();
+    if (dateFrom) pSum.set('date_from', dateFrom);
+    if (dateTo) pSum.set('date_to', dateTo);
+    const sum = await api('/api/billing/revenue-summary?' + pSum.toString());
+
+    if ($('kpi-total-billed')) $('kpi-total-billed').textContent = fmtInr(sum.total_billed);
+    if ($('kpi-invoice-count')) $('kpi-invoice-count').textContent = (sum.invoice_count || 0) + ' Invoices Generated';
+    if ($('kpi-total-collected')) $('kpi-total-collected').textContent = fmtInr(sum.total_collected);
+    const rate = sum.total_billed > 0 ? Math.round((sum.total_collected / sum.total_billed) * 100) : 100;
+    if ($('kpi-collection-rate')) $('kpi-collection-rate').textContent = rate + '% Collected';
+    if ($('kpi-total-outstanding')) $('kpi-total-outstanding').textContent = fmtInr(sum.total_outstanding);
+    const partialCount = (sum.payment_statuses?.partial?.count || 0) + (sum.payment_statuses?.pending?.count || 0);
+    if ($('kpi-pending-count')) $('kpi-pending-count').textContent = partialCount + ' Pending Balances';
+    if ($('kpi-avg-bill')) $('kpi-avg-bill').textContent = fmtInr(sum.average_bill_value);
+    if ($('kpi-total-discount')) $('kpi-total-discount').textContent = fmtInr(sum.total_discount) + ' Total Discounts';
+
+    // Doctor breakdown cards
+    const docBox = $('billing-doctor-breakdown');
+    if (docBox) {
+      const docs = sum.doctor_revenue || [];
+      if (!docs.length) {
+        docBox.innerHTML = '<span class="muted" style="font-size:0.85rem">No doctor revenue recorded yet.</span>';
+      } else {
+        docBox.innerHTML = docs.map(d => {
+          const pct = sum.total_billed > 0 ? Math.round((d.billed / sum.total_billed) * 100) : 0;
+          return `
+            <div style="margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;font-weight:600;font-size:0.88rem">
+                <span>${esc(d.doctor_name)}</span>
+                <span style="color:#10b981">${fmtInr(d.collected)}</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:0.75rem;color:var(--text2);margin-top:2px">
+                <span>${d.count} Bills (${pct}% share)</span>
+                <span>Billed: ${fmtInr(d.billed)}</span>
+              </div>
+              <div style="height:6px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;margin-top:4px">
+                <div style="width:${pct}%;height:100%;background:#3b82f6;border-radius:4px"></div>
+              </div>
+            </div>`;
+        }).join('');
+      }
+    }
+
+    // Top treatments breakdown
+    const trtBox = $('billing-treatment-breakdown');
+    if (trtBox) {
+      const trts = sum.top_treatments || [];
+      if (!trts.length) {
+        trtBox.innerHTML = '<span class="muted" style="font-size:0.85rem">No treatments recorded yet.</span>';
+      } else {
+        trtBox.innerHTML = trts.map(t => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem">
+            <div>
+              <b>${esc(t.treatment_name)}</b>
+              <div class="muted" style="font-size:0.75rem">${t.count} patient${t.count===1?'':'s'}</div>
+            </div>
+            <span style="font-weight:700;color:#38bdf8">${fmtInr(t.revenue)}</span>
+          </div>`).join('');
+      }
+    }
+
+    // Payment methods breakdown
+    const mtdBox = $('billing-method-breakdown');
+    if (mtdBox) {
+      const methods = sum.payment_methods || [];
+      if (!methods.length) {
+        mtdBox.innerHTML = '<span class="muted" style="font-size:0.85rem">No payments recorded yet.</span>';
+      } else {
+        mtdBox.innerHTML = methods.map(m => `
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:0.85rem">
+            <div>
+              <b>${esc(m.method)}</b>
+              <div class="muted" style="font-size:0.75rem">${m.count} transaction${m.count===1?'':'s'}</div>
+            </div>
+            <span style="font-weight:700;color:#10b981">${fmtInr(m.collected)}</span>
+          </div>`).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load revenue summary:', err);
+  }
+
+  // 2. Fetch Invoices List
+  try {
+    const pInv = new URLSearchParams();
+    if (q) pInv.set('q', q);
+    if (status) pInv.set('status', status);
+    if (doctor) pInv.set('doctor_name', doctor);
+    if (dateFrom) pInv.set('date_from', dateFrom);
+    if (dateTo) pInv.set('date_to', dateTo);
+
+    const r = await api('/api/billing/invoices?' + pInv.toString());
+    const invoices = r.invoices || [];
+    if ($('billing-invoices-count')) $('billing-invoices-count').textContent = (r.total || invoices.length) + ' Invoices Found';
+
+    const tableEl = $('billing-invoices-table');
+    if (!tableEl) return;
+
+    if (!invoices.length) {
+      tableEl.innerHTML = '<div class="muted" style="padding:24px;text-align:center">No invoices found matching these filters. Click <b>"➕ Generate New Bill"</b> to issue a patient invoice.</div>';
+      return;
+    }
+
+    const rowsHtml = invoices.map(inv => {
+      const st = String(inv.payment_status || 'paid').toLowerCase();
+      let statusBadge = '<span class="badge" style="background:#10b981;color:#fff">Paid</span>';
+      if (st === 'partial') {
+        statusBadge = `<span class="badge" style="background:#f59e0b;color:#000;font-weight:600">Due: ${fmtInr(inv.balance_amount)}</span>`;
+      } else if (st === 'pending') {
+        statusBadge = `<span class="badge" style="background:#ef4444;color:#fff">Pending</span>`;
+      }
+
+      const balBtn = (inv.balance_amount > 0)
+        ? `<button style="padding:3px 7px;font-size:0.78rem;background:#10b981;color:#fff;border:none;border-radius:4px;cursor:pointer" onclick="openRecordPaymentModal('${inv.id}', ${inv.balance_amount}, '${esc(inv.patient_name)}')">💵 Pay Balance</button>`
+        : '';
+
+      return `
+        <tr>
+          <td><b style="color:var(--primary);cursor:pointer" onclick="openInvoiceReceiptModal('${inv.id}')">${esc(inv.invoice_number)}</b></td>
+          <td>${esc(inv.treatment_date)}</td>
+          <td>
+            <b>${esc(inv.patient_name)}</b><br>
+            <span class="muted" style="font-size:0.75rem">${esc(inv.phone)}</span>
+          </td>
+          <td>${esc(inv.doctor_name || 'Dr. P. Sudhakar')}</td>
+          <td><b>${fmtInr(inv.total_amount)}</b></td>
+          <td style="color:#10b981">${fmtInr(inv.paid_amount)}</td>
+          <td style="color:${inv.balance_amount > 0 ? '#ef4444' : 'inherit'};font-weight:${inv.balance_amount > 0 ? '700' : 'normal'}">${fmtInr(inv.balance_amount)}</td>
+          <td>${statusBadge}</td>
+          <td><span class="muted" style="font-size:0.8rem">${esc(inv.payment_method)}</span></td>
+          <td style="white-space:nowrap">
+            <div class="row" style="gap:4px">
+              <button style="padding:3px 7px;font-size:0.78rem" onclick="openInvoiceReceiptModal('${inv.id}')" title="View / Print Tax Bill">👁️ Bill</button>
+              <button style="padding:3px 7px;font-size:0.78rem;background:#25d366;color:#fff;border:none;border-radius:4px" onclick="sendInvoiceWhatsApp('${inv.id}')" title="Send WhatsApp Receipt">💬 WhatsApp</button>
+              ${balBtn}
+            </div>
+          </td>
+        </tr>`;
+    }).join('');
+
+    tableEl.innerHTML = `
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="text-align:left;border-bottom:1px solid var(--border)">
+            <th style="padding:8px">Bill #</th>
+            <th style="padding:8px">Date</th>
+            <th style="padding:8px">Patient</th>
+            <th style="padding:8px">Doctor</th>
+            <th style="padding:8px">Total</th>
+            <th style="padding:8px">Paid</th>
+            <th style="padding:8px">Balance</th>
+            <th style="padding:8px">Status</th>
+            <th style="padding:8px">Method</th>
+            <th style="padding:8px">Actions</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>`;
+  } catch (err) {
+    toast(err.message || 'Failed to load invoices', 'err');
+  }
+}
+
+function resetBillingFilters() {
+  if ($('billing-search')) $('billing-search').value = '';
+  if ($('billing-filter-doctor')) $('billing-filter-doctor').value = '';
+  if ($('billing-filter-status')) $('billing-filter-status').value = '';
+  if ($('billing-from')) $('billing-from').value = '';
+  if ($('billing-to')) $('billing-to').value = '';
+  loadBillingRevenueUI();
+}
+
+function exportBillingSalesCSV() {
+  const dateFrom = $('billing-from')?.value || '';
+  const dateTo = $('billing-to')?.value || '';
+  let url = '/api/billing/export';
+  const p = new URLSearchParams();
+  if (dateFrom) p.set('date_from', dateFrom);
+  if (dateTo) p.set('date_to', dateTo);
+  if (p.toString()) url += '?' + p.toString();
+  window.location.href = url;
+}
+
+window.openCreateInvoiceModal = function(prefill = {}) {
+  const patientName = prefill.name || prefill.patient_name || prefill.lead_name || '';
+  const phone = prefill.phone || prefill.phone_number || '';
+  const docName = prefill.doctor_name || 'Dr. P. Sudhakar';
+  const today = new Date().toISOString().slice(0, 10);
+
+  _billingItems = [
+    {
+      treatment_name: 'Dental Checkup & Consultation',
+      tooth_number: '',
+      quantity: 1,
+      unit_price: 500
+    }
+  ];
+
+  const html = `
+    <h2 style="margin-bottom:6px">🧾 Generate Dental Treatment Invoice</h2>
+    <p class="muted" style="margin-bottom:14px">Create an itemized bill for Smile Dental &amp; Implant Centre. Automatically calculates totals and discounts.</p>
+    
+    <div class="grid cols-3" style="gap:10px;margin-bottom:12px">
+      <div>
+        <label style="font-weight:600">Patient Name *</label>
+        <input id="inv-patient-name" value="${esc(patientName)}" placeholder="e.g. Ramesh Kumar">
+      </div>
+      <div>
+        <label style="font-weight:600">Phone Number *</label>
+        <input id="inv-phone" value="${esc(phone)}" placeholder="e.g. +919876543210">
+      </div>
+      <div>
+        <label style="font-weight:600">Attending Doctor</label>
+        <select id="inv-doctor-name">
+          <option value="Dr. P. Sudhakar"${docName.includes('Sudhakar') ? ' selected' : ''}>Dr. P. Sudhakar (Chief Implantologist)</option>
+          <option value="Dr. K. Mounika"${docName.includes('Mounika') ? ' selected' : ''}>Dr. K. Mounika (Cosmetic Specialist)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row" style="gap:10px;margin-bottom:12px">
+      <div style="flex:1">
+        <label style="font-weight:600">Treatment Date</label>
+        <input id="inv-date" type="date" value="${today}">
+      </div>
+      <div style="flex:1">
+        <label style="font-weight:600">Payment Mode</label>
+        <select id="inv-payment-method">
+          <option value="UPI">UPI / GPay / PhonePe</option>
+          <option value="Cash">Cash</option>
+          <option value="Card">Debit / Credit Card (POS)</option>
+          <option value="Bank Transfer">Bank Transfer / NEFT</option>
+          <option value="Bajaj Finserv EMI">Bajaj Finserv Dental EMI</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin:14px 0 8px;display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0;font-size:0.95rem">Dental Procedures &amp; Treatments Performed</h3>
+      <button type="button" class="primary" style="padding:4px 10px;font-size:0.8rem" onclick="addTreatmentRowToModal()">➕ Add Treatment</button>
+    </div>
+
+    <div id="inv-items-container" style="display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.18);border:1px solid var(--border);border-radius:6px"></div>
+
+    <!-- Calculations Section -->
+    <div class="card" style="margin-top:12px;background:color-mix(in srgb,var(--card) 90%,var(--primary) 10%);padding:12px">
+      <div class="grid cols-4" style="gap:10px;align-items:end">
+        <div>
+          <label style="font-size:0.8rem">Subtotal</label>
+          <div id="inv-subtotal-disp" style="font-size:1.1rem;font-weight:700">₹0.00</div>
+        </div>
+        <div>
+          <label style="font-size:0.8rem">Discount (₹)</label>
+          <input id="inv-discount" type="number" min="0" value="0" step="50" oninput="updateModalInvoiceTotals()">
+        </div>
+        <div>
+          <label style="font-size:0.8rem">Tax / GST (₹)</label>
+          <input id="inv-tax" type="number" min="0" value="0" step="50" oninput="updateModalInvoiceTotals()">
+        </div>
+        <div>
+          <label style="font-size:0.8rem;font-weight:700">Grand Total Amount</label>
+          <div id="inv-total-disp" style="font-size:1.25rem;font-weight:800;color:#38bdf8">₹0.00</div>
+        </div>
+      </div>
+
+      <div class="grid cols-2" style="gap:10px;margin-top:10px;align-items:end;border-top:1px dashed var(--border);padding-top:8px">
+        <div>
+          <label style="font-weight:600">Amount Paid Now (₹)</label>
+          <input id="inv-paid-amount" type="number" min="0" step="100" oninput="updateModalInvoiceTotals()">
+        </div>
+        <div>
+          <label style="font-weight:600">Balance Due</label>
+          <div id="inv-balance-disp" style="font-size:1.15rem;font-weight:700;color:#ef4444">₹0.00</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label style="font-size:0.82rem">Clinical / Billing Notes</label>
+      <input id="inv-notes" placeholder="Optional notes e.g., warranty, medication advice, or next session details">
+    </div>
+
+    <p id="inv-modal-err" class="err" style="margin-top:8px;min-height:1.2em"></p>
+
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="primary" style="font-weight:700" onclick="submitCreateInvoice()">💾 Save &amp; Issue Invoice</button>
+      <button onclick="closeModal()">Cancel</button>
+    </div>
+  `;
+
+  showModal(html);
+  renderModalTreatmentRows();
+  updateModalInvoiceTotals(true);
+};
+
+function renderModalTreatmentRows() {
+  const container = $('inv-items-container');
+  if (!container) return;
+
+  const procOptionsHtml = DENTAL_PROCEDURES.map(p => 
+    `<option value="${esc(p.name)}" data-price="${p.price}">${esc(p.name)} (${p.price ? '₹'+p.price : 'Custom'})</option>`
+  ).join('');
+
+  container.innerHTML = _billingItems.map((item, idx) => `
+    <div class="row" style="gap:8px;align-items:center;background:var(--card);padding:6px;border-radius:4px;border:1px solid var(--border)">
+      <div style="flex:2">
+        <input list="proc-list-${idx}" id="proc-name-${idx}" value="${esc(item.treatment_name)}" placeholder="Dental Procedure" style="width:100%" onchange="onSelectProcedure(${idx}, this.value)">
+        <datalist id="proc-list-${idx}">${procOptionsHtml}</datalist>
+      </div>
+      <div style="width:85px">
+        <input id="proc-tooth-${idx}" value="${esc(item.tooth_number)}" placeholder="Tooth #" title="Tooth Number (e.g., 14, 21)" oninput="_billingItems[${idx}].tooth_number=this.value">
+      </div>
+      <div style="width:90px">
+        <input id="proc-price-${idx}" type="number" min="0" value="${item.unit_price}" placeholder="₹ Price" oninput="onItemPriceChange(${idx}, this.value)">
+      </div>
+      <div style="width:65px">
+        <input id="proc-qty-${idx}" type="number" min="1" value="${item.quantity}" placeholder="Qty" oninput="onItemQtyChange(${idx}, this.value)">
+      </div>
+      <div style="width:80px;font-weight:700;font-size:0.85rem;text-align:right" id="proc-total-${idx}">
+        ${fmtInr(item.unit_price * item.quantity)}
+      </div>
+      <button type="button" class="danger" style="padding:4px 8px;font-size:0.75rem" onclick="removeTreatmentRow(${idx})">✖</button>
+    </div>
+  `).join('');
+}
+
+window.addTreatmentRowToModal = function() {
+  _billingItems.push({
+    treatment_name: 'Scaling & Polishing (Cleaning)',
+    tooth_number: '',
+    quantity: 1,
+    unit_price: 1500
+  });
+  renderModalTreatmentRows();
+  updateModalInvoiceTotals();
+};
+
+window.removeTreatmentRow = function(idx) {
+  if (_billingItems.length <= 1) {
+    toast('At least one treatment item is required.', 'err');
+    return;
+  }
+  _billingItems.splice(idx, 1);
+  renderModalTreatmentRows();
+  updateModalInvoiceTotals();
+};
+
+window.onSelectProcedure = function(idx, val) {
+  _billingItems[idx].treatment_name = val;
+  const match = DENTAL_PROCEDURES.find(p => p.name === val);
+  if (match && match.price > 0) {
+    _billingItems[idx].unit_price = match.price;
+    const priceInput = $('proc-price-' + idx);
+    if (priceInput) priceInput.value = match.price;
+  }
+  const totEl = $('proc-total-' + idx);
+  if (totEl) totEl.textContent = fmtInr(_billingItems[idx].unit_price * _billingItems[idx].quantity);
+  updateModalInvoiceTotals();
+};
+
+window.onItemPriceChange = function(idx, val) {
+  _billingItems[idx].unit_price = Number(val || 0);
+  const totEl = $('proc-total-' + idx);
+  if (totEl) totEl.textContent = fmtInr(_billingItems[idx].unit_price * _billingItems[idx].quantity);
+  updateModalInvoiceTotals();
+};
+
+window.onItemQtyChange = function(idx, val) {
+  _billingItems[idx].quantity = Math.max(1, parseInt(val || 1, 10));
+  const totEl = $('proc-total-' + idx);
+  if (totEl) totEl.textContent = fmtInr(_billingItems[idx].unit_price * _billingItems[idx].quantity);
+  updateModalInvoiceTotals();
+};
+
+window.updateModalInvoiceTotals = function(initial = false) {
+  let subtotal = 0;
+  _billingItems.forEach(it => {
+    subtotal += (it.unit_price || 0) * (it.quantity || 1);
+  });
+
+  const disc = Number($('inv-discount')?.value || 0);
+  const tax = Number($('inv-tax')?.value || 0);
+  const total = Math.max(0, subtotal - disc + tax);
+
+  if ($('inv-subtotal-disp')) $('inv-subtotal-disp').textContent = fmtInr(subtotal);
+  if ($('inv-total-disp')) $('inv-total-disp').textContent = fmtInr(total);
+
+  const paidInput = $('inv-paid-amount');
+  if (initial && paidInput) {
+    paidInput.value = total;
+  }
+
+  const paid = Number(paidInput?.value || 0);
+  const balance = Math.max(0, total - paid);
+
+  const balEl = $('inv-balance-disp');
+  if (balEl) {
+    balEl.textContent = fmtInr(balance);
+    balEl.style.color = balance > 0 ? '#ef4444' : '#10b981';
+  }
+};
+
+window.submitCreateInvoice = async function() {
+  const patient_name = $('inv-patient-name')?.value.trim();
+  const phone = $('inv-phone')?.value.trim();
+  const doctor_name = $('inv-doctor-name')?.value;
+  const treatment_date = $('inv-date')?.value;
+  const payment_method = $('inv-payment-method')?.value;
+  const discount = Number($('inv-discount')?.value || 0);
+  const tax = Number($('inv-tax')?.value || 0);
+  const paid_amount = Number($('inv-paid-amount')?.value || 0);
+  const notes = $('inv-notes')?.value.trim();
+  const errEl = $('inv-modal-err');
+
+  if (!patient_name) {
+    if (errEl) errEl.textContent = 'Please enter patient name.';
+    return;
+  }
+  if (!phone) {
+    if (errEl) errEl.textContent = 'Please enter phone number.';
+    return;
+  }
+  if (!_billingItems.length) {
+    if (errEl) errEl.textContent = 'At least one treatment item is required.';
+    return;
+  }
+
+  try {
+    if (errEl) errEl.textContent = 'Issuing invoice...';
+    const payload = {
+      patient_name,
+      phone,
+      doctor_name,
+      treatment_date,
+      payment_method,
+      items: _billingItems,
+      discount,
+      tax,
+      paid_amount,
+      notes
+    };
+
+    const r = await api('/api/billing/invoices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const inv = r.invoice;
+    toast(`Invoice ${inv.invoice_number} generated successfully!`);
+    closeModal();
+    loadBillingRevenueUI();
+
+    // Open receipt modal right away
+    setTimeout(() => openInvoiceReceiptModal(inv.id), 150);
+  } catch (err) {
+    if (errEl) errEl.textContent = err.message || 'Failed to create invoice';
+    toast(err.message || 'Invoice creation failed', 'err');
+  }
+};
+
+window.openRecordPaymentModal = function(invoiceId, balanceDue, patientName) {
+  const today = new Date().toISOString().slice(0, 10);
+  const html = `
+    <h2 style="margin-bottom:6px">💵 Record Balance Payment</h2>
+    <p class="muted" style="margin-bottom:14px">Record a payment received for patient <b>${esc(patientName)}</b>.</p>
+    
+    <div class="card" style="background:rgba(0,0,0,0.18);margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span>Current Outstanding Balance:</span>
+        <b style="font-size:1.25rem;color:#ef4444">${fmtInr(balanceDue)}</b>
+      </div>
+    </div>
+
+    <div class="grid cols-2" style="gap:10px">
+      <div>
+        <label style="font-weight:600">Payment Amount Received (₹) *</label>
+        <input id="rec-pmt-amount" type="number" min="1" max="${balanceDue}" value="${balanceDue}">
+      </div>
+      <div>
+        <label style="font-weight:600">Payment Channel *</label>
+        <select id="rec-pmt-method">
+          <option value="UPI">UPI / GPay / PhonePe</option>
+          <option value="Cash">Cash</option>
+          <option value="Card">Debit / Credit Card</option>
+          <option value="Bank Transfer">Bank Transfer</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label>Notes / Receipt Reference</label>
+      <input id="rec-pmt-notes" placeholder="e.g. UPI Ref # or installment 2">
+    </div>
+
+    <p id="rec-pmt-err" class="err" style="margin-top:8px;min-height:1.2em"></p>
+
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="primary" style="font-weight:700" onclick="submitRecordPayment('${invoiceId}')">Confirm &amp; Record Payment</button>
+      <button onclick="closeModal()">Cancel</button>
+    </div>
+  `;
+  showModal(html);
+};
+
+window.submitRecordPayment = async function(invoiceId) {
+  const amount = Number($('rec-pmt-amount')?.value || 0);
+  const payment_method = $('rec-pmt-method')?.value || 'UPI';
+  const notes = $('rec-pmt-notes')?.value.trim();
+  const errEl = $('rec-pmt-err');
+
+  if (amount <= 0) {
+    if (errEl) errEl.textContent = 'Please enter a valid payment amount.';
+    return;
+  }
+
+  try {
+    if (errEl) errEl.textContent = 'Recording payment...';
+    const r = await api(`/api/billing/invoices/${encodeURIComponent(invoiceId)}/payment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount, payment_method, notes })
+    });
+
+    toast('Payment recorded successfully!');
+    closeModal();
+    loadBillingRevenueUI();
+    setTimeout(() => openInvoiceReceiptModal(invoiceId), 150);
+  } catch (err) {
+    if (errEl) errEl.textContent = err.message || 'Payment recording failed';
+    toast(err.message || 'Failed', 'err');
+  }
+};
+
+window.openInvoiceReceiptModal = async function(invoiceId) {
+  showModal('<h2>Loading Invoice Receipt...</h2><p class="muted">Fetching bill details...</p>');
+  try {
+    const res = await api(`/api/billing/invoices/${encodeURIComponent(invoiceId)}`);
+    const inv = res.invoice;
+    if (!inv) throw new Error('Invoice data not found');
+
+    const itemsHtml = (inv.items || []).map((it, idx) => `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.06)">
+        <td style="padding:6px 8px">${idx + 1}</td>
+        <td style="padding:6px 8px">
+          <b>${esc(it.treatment_name)}</b>
+          ${it.tooth_number ? `<span class="badge" style="font-size:0.75rem;margin-left:6px">Tooth #${esc(it.tooth_number)}</span>` : ''}
+        </td>
+        <td style="padding:6px 8px;text-align:center">${it.quantity}</td>
+        <td style="padding:6px 8px;text-align:right">${fmtInr(it.unit_price)}</td>
+        <td style="padding:6px 8px;text-align:right;font-weight:600">${fmtInr(it.total_price)}</td>
+      </tr>
+    `).join('');
+
+    const paymentsHtml = (inv.payments || []).map(p => `
+      <div style="display:flex;justify-content:space-between;font-size:0.8rem;padding:3px 0;color:var(--text2)">
+        <span>${esc(p.payment_date)} via ${esc(p.payment_method)} (${esc(p.notes || 'Payment')})</span>
+        <span style="font-weight:600;color:#10b981">${fmtInr(p.amount)}</span>
+      </div>
+    `).join('');
+
+    const st = String(inv.payment_status || 'paid').toUpperCase();
+    const stColor = st === 'PAID' ? '#10b981' : (st === 'PARTIAL' ? '#f59e0b' : '#ef4444');
+
+    const html = `
+      <div id="printable-invoice" style="padding:4px">
+        <!-- Clinic Letterhead -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid var(--border);padding-bottom:12px;margin-bottom:12px">
+          <div>
+            <h2 style="margin:0;font-size:1.3rem;display:flex;align-items:center;gap:6px">🦷 SMILE DENTAL AND IMPLANT CENTRE</h2>
+            <div style="font-size:0.82rem;color:var(--text2);margin-top:4px">
+              H.No. 1-1-308/8, Plot No. 8, 1st Floor, Above K. Rathod Jewellers<br>
+              Sri Ram Nagar Colony, Near Kapra Circle, Saket Road, ECIL, Secunderabad – 500062<br>
+              📞 +91 7396529265 | +91 9490618635 | 🌐 smiledentalandimplantcentre.com
+            </div>
+          </div>
+          <div style="text-align:right">
+            <span class="badge" style="font-size:0.9rem;padding:4px 10px;background:${stColor};color:#fff;font-weight:700">${st}</span>
+            <div style="font-size:0.85rem;margin-top:6px"><b>Invoice #:</b> ${esc(inv.invoice_number)}</div>
+            <div style="font-size:0.82rem;color:var(--text2)"><b>Date:</b> ${esc(inv.treatment_date)}</div>
+          </div>
+        </div>
+
+        <!-- Patient & Doctor Info -->
+        <div class="grid cols-2" style="gap:10px;background:rgba(0,0,0,0.12);padding:10px;border-radius:6px;margin-bottom:14px;font-size:0.88rem">
+          <div>
+            <div class="muted" style="font-size:0.75rem">PATIENT DETAILS</div>
+            <div style="font-size:1.05rem;font-weight:700">${esc(inv.patient_name)}</div>
+            <div>Phone: ${esc(inv.phone)}</div>
+          </div>
+          <div>
+            <div class="muted" style="font-size:0.75rem">ATTENDING DOCTOR</div>
+            <div style="font-size:1.05rem;font-weight:700">${esc(inv.doctor_name || 'Dr. P. Sudhakar')}</div>
+            <div style="font-size:0.8rem;color:var(--text2)">Smile Dental &amp; Implant Centre</div>
+          </div>
+        </div>
+
+        <!-- Line Items Table -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:0.88rem">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);background:rgba(255,255,255,0.04);text-align:left">
+              <th style="padding:6px 8px;width:30px">#</th>
+              <th style="padding:6px 8px">Treatment / Procedure</th>
+              <th style="padding:6px 8px;text-align:center;width:50px">Qty</th>
+              <th style="padding:6px 8px;text-align:right;width:100px">Unit Price</th>
+              <th style="padding:6px 8px;text-align:right;width:110px">Amount</th>
+            </tr>
+          </thead>
+          <tbody>${itemsHtml}</tbody>
+        </table>
+
+        <!-- Totals & Payment Summary -->
+        <div style="display:flex;justify-content:space-between;gap:16px;border-top:1px solid var(--border);padding-top:10px">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:0.82rem;margin-bottom:4px">Payment Transactions:</div>
+            ${paymentsHtml || '<span class="muted" style="font-size:0.8rem">No payment recorded</span>'}
+            ${inv.notes ? `<div style="margin-top:8px;font-size:0.8rem;color:var(--text2)"><b>Notes:</b> ${esc(inv.notes)}</div>` : ''}
+          </div>
+          <div style="width:230px;font-size:0.88rem">
+            <div style="display:flex;justify-content:space-between;padding:3px 0">
+              <span>Subtotal:</span>
+              <span>${fmtInr(inv.subtotal)}</span>
+            </div>
+            ${inv.discount > 0 ? `
+              <div style="display:flex;justify-content:space-between;padding:3px 0;color:#10b981">
+                <span>Discount:</span>
+                <span>-${fmtInr(inv.discount)}</span>
+              </div>` : ''}
+            ${inv.tax > 0 ? `
+              <div style="display:flex;justify-content:space-between;padding:3px 0">
+                <span>Tax / GST:</span>
+                <span>${fmtInr(inv.tax)}</span>
+              </div>` : ''}
+            <div style="display:flex;justify-content:space-between;padding:5px 0;border-top:1px solid var(--border);font-size:1.1rem;font-weight:800;color:var(--primary)">
+              <span>Grand Total:</span>
+              <span>${fmtInr(inv.total_amount)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;color:#10b981;font-weight:600">
+              <span>Paid Amount:</span>
+              <span>${fmtInr(inv.paid_amount)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;color:${inv.balance_amount > 0 ? '#ef4444' : 'inherit'};font-weight:700">
+              <span>Balance Due:</span>
+              <span>${fmtInr(inv.balance_amount)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;justify-content:space-between;align-items:flex-end;border-top:1px dashed var(--border);padding-top:12px;font-size:0.75rem;color:var(--text2)">
+          <div>
+            * This is a computer generated clinic treatment invoice.<br>
+            For appointments or emergencies, call +91 7396529265 / +91 9490618635.
+          </div>
+          <div style="text-align:right">
+            <div style="margin-bottom:28px">_____________________________</div>
+            <b>Authorized Signatory / Doctor</b>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:16px;display:flex;justify-content:space-between">
+        <button style="background:#25d366;color:#fff;font-weight:700;border:none;border-radius:6px;padding:8px 14px" onclick="sendInvoiceWhatsApp('${inv.id}')">💬 Send WhatsApp Receipt</button>
+        <div class="row" style="gap:8px">
+          <button class="primary" onclick="printReceiptSection()">🖨️ Print Receipt</button>
+          <button onclick="closeModal()">Close</button>
+        </div>
+      </div>
+    `;
+    showModal(html);
+  } catch (err) {
+    showModal(`<h2>Invoice Receipt</h2><p class="err">${esc(err.message || 'Could not load invoice')}</p><div class="modal-actions"><button onclick="closeModal()">Close</button></div>`);
+  }
+};
+
+window.printReceiptSection = function() {
+  window.print();
+};
+
+window.sendInvoiceWhatsApp = async function(invoiceId) {
+  try {
+    toast('Sending itemized WhatsApp bill to patient...');
+    const r = await api(`/api/billing/invoices/${encodeURIComponent(invoiceId)}/send-whatsapp`, { method: 'POST' });
+    if (r.delivered) {
+      toast('WhatsApp bill delivered to patient! ✅');
+    } else {
+      toast('WhatsApp receipt generated (Preview available).', 'ok');
+    }
+  } catch (err) {
+    toast(err.message || 'WhatsApp sending failed', 'err');
+  }
+};
+
 async function loadKanban(){try{const r=await api('/api/crm/kanban');$('kanban-board').innerHTML=(r.columns||[]).map(col=>`<div class="card kanban-column" data-stage="${esc(col.id)}" ondragover="kanbanDragOver(event)" ondragleave="kanbanDragLeave(event)" ondrop="kanbanDrop(event,'${esc(col.id)}')"><h3>${esc(col.label)} <span class="badge">${(col.leads||[]).length}</span></h3>${(col.leads||[]).slice(0,40).map(l=>`<div class="card kanban-lead" draggable="true" ondragstart="kanbanDragStart(event,'${encodeURIComponent(l.phone_number||'')}')" style="padding:10px;margin-top:8px"><b>${esc(l.lead_name||l.phone_number)}</b><br><span class="muted">${esc(l.phone_number||'')}</span><div class="row-actions" style="margin-top:8px">${['contacted','interested','callback_requested','demo_booked','demo_done','converted','not_interested','lost'].filter(st=>st!==col.id).map(st=>`<button onclick="moveLeadStage('${encodeURIComponent(l.phone_number||'')}','${st}')">${st.replaceAll('_',' ')}</button>`).join('')}</div></div>`).join('')}</div>`).join('')}catch(e){toast(e.message||'Could not load pipeline','err')}}
 function kanbanDragStart(event,phoneEnc){event.dataTransfer.setData('text/plain',phoneEnc);event.dataTransfer.effectAllowed='move'}
 function kanbanDragOver(event){event.preventDefault();event.dataTransfer.dropEffect='move';event.currentTarget.classList.add('drag-over')}

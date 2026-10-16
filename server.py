@@ -9245,3 +9245,154 @@ async def api_get_outbound_schedule_status():
         "allowed_days": sorted(allowed_days),
         "next_allowed_at": win_err.get("next_allowed_at") if win_err else None,
     }
+
+
+# ── Dental Billing, Invoicing & Revenue Endpoints ──────────────────────────────
+
+class CreateInvoiceApiRequest(BaseModel):
+    patient_name: str
+    phone: str
+    doctor_name: Optional[str] = "Dr. P. Sudhakar"
+    doctor_id: Optional[str] = ""
+    treatment_date: Optional[str] = None
+    items: Optional[List[Dict[str, Any]]] = None
+    discount: Optional[float] = 0.0
+    tax: Optional[float] = 0.0
+    paid_amount: Optional[float] = None
+    payment_method: Optional[str] = "UPI"
+    notes: Optional[str] = ""
+
+
+class RecordPaymentApiRequest(BaseModel):
+    amount: float
+    payment_method: Optional[str] = "UPI"
+    notes: Optional[str] = ""
+
+
+@app.get("/api/billing/invoices")
+async def api_list_invoices(
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    doctor_name: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    from billing import list_invoices
+    try:
+        return await list_invoices(
+            q=q,
+            status=status,
+            doctor_name=doctor_name,
+            date_from=date_from,
+            date_to=date_to,
+            limit=limit,
+            offset=offset,
+        )
+    except Exception as exc:
+        logger.error(f"api_list_invoices error: {exc}")
+        raise HTTPException(500, str(exc))
+
+
+@app.post("/api/billing/invoices")
+async def api_create_invoice(req: CreateInvoiceApiRequest):
+    from billing import create_invoice
+    try:
+        inv = await create_invoice(req.dict())
+        return {"success": True, "invoice": inv}
+    except ValueError as ve:
+        raise HTTPException(400, str(ve))
+    except Exception as exc:
+        logger.error(f"api_create_invoice error: {exc}")
+        raise HTTPException(500, str(exc))
+
+
+@app.get("/api/billing/invoices/{invoice_id}")
+async def api_get_invoice(invoice_id: str):
+    from billing import get_invoice
+    inv = await get_invoice(invoice_id)
+    if not inv:
+        raise HTTPException(404, "Invoice not found")
+    return {"invoice": inv}
+
+
+@app.post("/api/billing/invoices/{invoice_id}/payment")
+async def api_record_invoice_payment(invoice_id: str, req: RecordPaymentApiRequest):
+    from billing import add_invoice_payment
+    try:
+        inv = await add_invoice_payment(
+            invoice_id=invoice_id,
+            amount=req.amount,
+            payment_method=req.payment_method or "UPI",
+            notes=req.notes or "",
+        )
+        return {"success": True, "invoice": inv}
+    except ValueError as ve:
+        raise HTTPException(400, str(ve))
+    except Exception as exc:
+        logger.error(f"api_record_invoice_payment error: {exc}")
+        raise HTTPException(500, str(exc))
+
+
+@app.get("/api/billing/revenue-summary")
+async def api_get_revenue_summary(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    from billing import get_revenue_summary
+    try:
+        return await get_revenue_summary(date_from=date_from, date_to=date_to)
+    except Exception as exc:
+        logger.error(f"api_get_revenue_summary error: {exc}")
+        raise HTTPException(500, str(exc))
+
+
+@app.get("/api/billing/export")
+async def api_export_billing_sales(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+):
+    from billing import export_sales_csv
+    try:
+        csv_data = await export_sales_csv(date_from=date_from, date_to=date_to)
+        return Response(
+            content=csv_data,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=smiledental_sales_report.csv"},
+        )
+    except Exception as exc:
+        logger.error(f"api_export_billing_sales error: {exc}")
+        raise HTTPException(500, str(exc))
+
+
+@app.post("/api/billing/invoices/{invoice_id}/send-whatsapp")
+async def api_send_invoice_whatsapp(invoice_id: str):
+    from billing import get_invoice, generate_whatsapp_receipt_text
+    inv = await get_invoice(invoice_id)
+    if not inv:
+        raise HTTPException(404, "Invoice not found")
+
+    phone = inv.get("phone")
+    if not phone:
+        raise HTTPException(400, "Patient phone number is missing")
+
+    text = generate_whatsapp_receipt_text(inv)
+    try:
+        from whatsapp import send_whatsapp_text
+        res = await send_whatsapp_text(phone, text)
+        return {
+            "success": True,
+            "delivered": bool(res and res.get("success")),
+            "details": res,
+            "preview": text,
+        }
+    except Exception as exc:
+        logger.error(f"api_send_invoice_whatsapp error: {exc}")
+        return {
+            "success": True,
+            "delivered": False,
+            "error": str(exc),
+            "preview": text,
+        }
+

@@ -606,3 +606,55 @@ SET @airzen_schema_sql = IF(
 PREPARE airzen_schema_stmt FROM @airzen_schema_sql;
 EXECUTE airzen_schema_stmt;
 DEALLOCATE PREPARE airzen_schema_stmt;
+
+-- ==============================================================================
+-- Dental Clinic Invoicing, Billing & Revenue System
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id CHAR(36) PRIMARY KEY,
+  invoice_number VARCHAR(64) NOT NULL UNIQUE,
+  patient_name VARCHAR(255) NOT NULL,
+  phone VARCHAR(32) NOT NULL,
+  doctor_id VARCHAR(64) NOT NULL DEFAULT '',
+  doctor_name VARCHAR(255) NOT NULL DEFAULT '',
+  treatment_date DATE NOT NULL,
+  subtotal DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  discount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  tax DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  balance_amount DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  payment_status VARCHAR(32) NOT NULL DEFAULT 'paid',
+  payment_method VARCHAR(64) NOT NULL DEFAULT 'UPI',
+  notes TEXT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  KEY idx_invoices_phone (phone),
+  KEY idx_invoices_treatment_date (treatment_date),
+  KEY idx_invoices_payment_status (payment_status),
+  KEY idx_invoices_doctor (doctor_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id CHAR(36) PRIMARY KEY,
+  invoice_id CHAR(36) NOT NULL,
+  treatment_name VARCHAR(255) NOT NULL,
+  tooth_number VARCHAR(32) NOT NULL DEFAULT '',
+  quantity INT NOT NULL DEFAULT 1,
+  unit_price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  total_price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_invoice_items_invoice_id (invoice_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS invoice_payments (
+  id CHAR(36) PRIMARY KEY,
+  invoice_id CHAR(36) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  payment_method VARCHAR(64) NOT NULL DEFAULT 'UPI',
+  payment_date DATE NOT NULL,
+  notes TEXT NULL,
+  created_at DATETIME(6) NOT NULL,
+  KEY idx_invoice_payments_invoice_id (invoice_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
