@@ -215,3 +215,33 @@ A dedicated clinic financial, invoicing, and revenue tracking system built speci
    - Professional, clinic-branded printable invoice with clinic address, phone numbers, treatment line items, and authorized doctor signature line.
    - 1-Click WhatsApp itemized receipt generator dispatched directly to patient's mobile number.
 
+---
+
+## 8. Doctor Appointments & Doctor Operations System
+
+The entire appointment scheduling workflow, settings, and team operations have been tailored for dental consultations and specialist surgeries:
+
+1. **Doctor Terminology & Branding Across UI:**
+   - Sidebar tab and hero changed from generic `Staff Operations` to `🩺 Doctor Operations`.
+   - Appointments panel upgraded to `🦷 Doctor & Clinic Appointments`.
+   - Modals and patient appointment cards display `Attending Doctor` (e.g. `👨‍⚕️ Dr. P. Sudhakar` or `👨‍⚕️ Dr. K. Mounika`).
+   - Action buttons and toasts tailored: `➕ Book Doctor Appointment`, `Notify Doctor`, `Doctor attendance`, and `Doctor leave requests`.
+
+2. **Pre-configured Dental Consultation Settings (`APPOINTMENT_PRESETS`):**
+   - **Appointment Name:** `Doctor Dental Consultation`
+   - **Default Service / Purpose:** `Dental Checkup & Consultation`
+   - **Delivery Mode:** `On-site (In-Clinic Consultation)`
+   - **Clinic Location Label:** `Clinic Address (Kapra Circle, ECIL)`
+   - **Doctor Label:** `Attending Doctor`
+   - **Default Doctor Role:** `dentist` (with flexible matching for `implantologist`, `cosmetic_dentist`, etc.)
+   - **Intake Prompt:** Pre-consultation patient questions for primary dental concerns (Tooth pain, Implants, Root Canal, Braces).
+   - **Duration & Buffers:** 30 minutes consultation with 15-minute hygiene sterilization buffer.
+   - **Timezone:** `Asia/Kolkata` (IST).
+
+3. **Multi-Doctor Round-Robin & Direct Doctor Booking:**
+   - Supports auto-assigning available doctors or selecting specific attending doctor:
+     - `Dr. P. Sudhakar (BDS, MDS - Senior Consultant & Chief Implantologist)`
+     - `Dr. K. Mounika (BDS, PGDCC - Cosmetic Dental Surgeon & Facial Aesthetics Specialist)`
+   - Live time-slot validation verifying doctor operating hours, clinic working days, and existing appointments before confirming bookings.
+
+
