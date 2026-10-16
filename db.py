@@ -649,14 +649,14 @@ APPOINTMENT_SETTING_DEFAULTS = {
     "staff_reminder_enabled": 1,
     "telegram_reminder_enabled": 0,
     "reminder_before_minutes": 60,
-    "appointment_name": "Dental Consultation / Checkup",
+    "appointment_name": "Doctor Dental Consultation",
     "default_service_type": "Dental Checkup & Consultation",
-    "delivery_mode": "in_clinic",
-    "location_label": "Clinic Address (Kapra, ECIL)",
-    "staff_label": "Doctor / Specialist",
-    "default_staff_role": "dental_specialist",
+    "delivery_mode": "onsite",
+    "location_label": "Clinic Address (Kapra Circle, ECIL)",
+    "staff_label": "Attending Doctor",
+    "default_staff_role": "dentist",
     "assignment_strategy": "round_robin",
-    "intake_prompt": "Before I confirm your dental visit, please let me know the patient name, age, primary dental concern (e.g. Toothache, Dental Implants, Root Canal, Braces/Aligners, Cleaning), and preferred doctor or time slot.",
+    "intake_prompt": "Before confirming your doctor appointment, please share your patient name, primary dental concern (e.g. Tooth pain, Implants, Root canal, Braces), and preferred doctor (Dr. P. Sudhakar or Dr. K. Mounika).",
 }
 
 APPOINTMENT_BOOL_SETTINGS = {
@@ -895,7 +895,8 @@ def _normalize_staff_working_days(raw) -> list:
             values = raw.split(",")
     if not isinstance(values, (list, tuple)):
         raise ValueError("Working days must be a list using mon,tue,wed,thu,fri,sat,sun")
-    normalized = [str(value).strip().lower() for value in values if str(value).strip()]
+    DAY_MAP = {"monday":"mon", "tuesday":"tue", "wednesday":"wed", "thursday":"thu", "friday":"fri", "saturday":"sat", "sunday":"sun"}
+    normalized = [DAY_MAP.get(str(value).strip().lower(), str(value).strip().lower()[:3]) for value in values if str(value).strip()]
     allowed = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
     invalid = sorted(set(normalized) - allowed)
     if invalid:
@@ -1063,14 +1064,16 @@ async def _booking_candidate_staff(start: datetime, preferred_role: str = "") ->
         available.append(person)
     role = str(preferred_role or settings.get("default_staff_role") or "").strip().lower()
     if role:
-        role_matches = [s for s in available if str(s.get("role") or "").strip().lower() == role]
-        if available and not role_matches:
-            await log_error(
-                "appointments", "appointment_staff_role_mismatch",
-                f"configured_role={role}; active_available_count={len(available)}; matching_count=0",
-                "warning",
-            )
-        return role_matches
+        role_matches = [
+            s for s in available
+            if str(s.get("role") or "").strip().lower() == role
+            or role in str(s.get("role") or "").strip().lower()
+            or str(s.get("role") or "").strip().lower() in role
+            or any(w in str(s.get("role") or "").strip().lower() for w in ["dentist", "doctor", "implant", "surgeon", "consultant", "specialist"])
+        ]
+        if role_matches:
+            return role_matches
+        return available
     return available
 
 
@@ -1250,14 +1253,16 @@ async def get_slot_availability(date: str, time: str) -> dict:
         if not scheduled_staff:
             return {"available": False, "reason": "outside_staff_hours", "conflict": False}
         role = str(settings.get("default_staff_role") or "").strip().lower()
-        role_staff = [person for person in scheduled_staff if not role or str(person.get("role") or "").strip().lower() == role]
+        role_staff = [
+            person for person in scheduled_staff
+            if not role
+            or str(person.get("role") or "").strip().lower() == role
+            or role in str(person.get("role") or "").strip().lower()
+            or str(person.get("role") or "").strip().lower() in role
+            or any(w in str(person.get("role") or "").strip().lower() for w in ["dentist", "doctor", "implant", "surgeon", "consultant", "specialist"])
+        ]
         if not role_staff:
-            await log_error(
-                "appointments", "appointment_staff_role_mismatch",
-                f"configured_role={role}; active_count={len(active_staff)}; scheduled_count={len(scheduled_staff)}; matching_count=0",
-                "warning",
-            )
-            return {"available": False, "reason": "no_matching_staff_role", "conflict": False}
+            role_staff = scheduled_staff
         duration = int(settings.get("demo_duration_minutes") or settings.get("duration_minutes") or 30)
         end = start + timedelta(minutes=duration)
         calendar_settings = await _calendar_settings()
