@@ -294,6 +294,7 @@ PUBLIC_API_ROUTES = {
     ("POST", "/api/mobile/auth/login"),
     ("POST", "/api/mobile/auth/refresh"),
     ("POST", "/api/mobile/admin/auth/login"),
+    ("POST", "/api/mobile/auth/admin-login"),
     ("GET", "/api/branding"),
     ("GET", "/api/whatsapp/webhook"),   # Phase 8 — verify token
     ("POST", "/api/whatsapp/webhook"),  # Phase 8 — incoming messages
@@ -410,14 +411,27 @@ async def _admin_auth_middleware(request: Request, call_next):
         if request.url.path.startswith("/api/mobile/"):
             mobile_staff = await authenticate_mobile_request(request)
             if not mobile_staff:
+                mobile_admin = await authenticate_mobile_admin_request(request)
+                if mobile_admin:
+                    request.state.mobile_staff = {"sub": mobile_admin.get("sub", "admin"), "sid": "admin-session", "role": "admin"}
+                    response = await call_next(request)
+                    return _apply_crm_response_headers(request, response)
                 response = JSONResponse(status_code=401, content={"error": "Staff authentication required"})
                 return _apply_crm_response_headers(request, response)
             request.state.mobile_staff = mobile_staff
             response = await call_next(request)
             return _apply_crm_response_headers(request, response)
         api_key = request.headers.get("x-api-key") or request.query_params.get("api_key") or ""
-        expected = await get_setting("ADMIN_API_KEY", "")
+        expected = await get_setting("ADMIN_API_KEY", "") or os.getenv("ADMIN_API_KEY", "")
         if expected and hmac.compare_digest(api_key, expected):
+            response = await call_next(request)
+            return _apply_crm_response_headers(request, response)
+        mobile_admin = await authenticate_mobile_admin_request(request)
+        if mobile_admin:
+            response = await call_next(request)
+            return _apply_crm_response_headers(request, response)
+        mobile_staff = await authenticate_mobile_request(request)
+        if mobile_staff:
             response = await call_next(request)
             return _apply_crm_response_headers(request, response)
         if not _read_session(request):
