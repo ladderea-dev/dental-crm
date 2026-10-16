@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Smile Dental Staff",
+    "slug": "smiledental-staff",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.smiledental.staff",
+      "permissions": [
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "backgroundColor": "#0E7490",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false,
+          "locationWhenInUsePermission": "Smile Dental uses location to verify clinic branch attendance check-in."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Smile Dental uses the camera for clinical dental photos and payment receipts.",
+          "photosPermission": "Smile Dental accesses selected photos only when attaching clinical records.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true
+        }
+      ]
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
