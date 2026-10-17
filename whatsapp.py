@@ -1564,7 +1564,10 @@ async def build_template_params(template_purpose: str, context: Optional[dict] =
         "staff_demo_status_request": [name, customer_phone, appointment_datetime],
         "service_completion_template": [name, service, appointment_datetime],
     }
-    params = variants.get(purpose, [])[:expected]
+    expected = await get_template_expected_param_count(purpose)
+    params = variants.get(purpose, [])
+    if expected is not None and expected >= 0:
+        params = params[:expected]
     return {
         "template_purpose": purpose,
         "template_name": template_name,

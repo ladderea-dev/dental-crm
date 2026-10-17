@@ -343,6 +343,10 @@ def normalize_phone(phone: str) -> str:
         # International "00" prefix (e.g. 006590000000 → +6590000000)
         if len(digits) >= 11 and digits.startswith("00"):
             digits = "+" + digits[2:]
+        elif len(digits) == 10 and (DEFAULT_COUNTRY_CODE == "+91" or os.getenv("APP_COUNTRY_CODE") == "+91"):
+            digits = "+91" + digits
+        elif len(digits) == 12 and digits.startswith("91"):
+            digits = "+" + digits
         elif len(digits) == 8:
             digits = DEFAULT_COUNTRY_CODE + digits
         elif len(digits) == 9 and digits.startswith("0"):
