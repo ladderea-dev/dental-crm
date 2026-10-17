@@ -4421,6 +4421,14 @@ async def create_wa_template_in_meta(purpose: str, language: str = "") -> dict:
             data = await resp.json(content_type=None)
             if resp.status >= 400:
                 details = _meta_api_error_details(resp.status, data)
+                err_text = str(data.get("error", {})).lower()
+                if "already english content" in err_text or "already exists" in err_text or "duplicate" in err_text:
+                    template["status"] = "Approved"
+                    templates = [t for t in await get_wa_template_objects() if not (t["purpose"] == template["purpose"] and t["language"] == template["language"])]
+                    templates.append(template)
+                    await save_wa_template_objects(templates)
+                    await _log_meta_template_api_response("template_create_meta", template["meta_template_name"], template["language"], "already_exists", resp.status, data, payload)
+                    return {"ok": True, "already_exists": True, "template": template, "status": "Approved"}
                 await _log_meta_template_api_response("template_create_meta", template["meta_template_name"], template["language"], "failed", resp.status, data, payload)
                 return {
                     "ok": False,
