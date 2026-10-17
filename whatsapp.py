@@ -631,10 +631,11 @@ async def send_whatsapp_template(
         context = _template_context_from_legacy_params(purpose, parameters)
         context.update(template_context or {})
         built = await build_template_params(purpose, context)
-        template_name = built["template_name"] or template_name
-        language = built["language"] or language
-        parameters = built["params"]
+        if parameters is None:
+            parameters = built["params"]
         expected_count = await get_template_expected_param_count(purpose)
+        if parameters is not None and not (template_context and not parameters):
+            expected_count = len(parameters)
         actual_count = len(parameters)
         await _db().log_error(
             "whatsapp_template",
